@@ -1,38 +1,48 @@
 <script lang="ts">
-	import favicon from '$lib/assets/favicon.svg'
-	import { onMount, setContext } from 'svelte'
-	import { messages } from '$lib/stores/messages.svelte';
-	import '../app.css'
+  import favicon from '$lib/assets/favicon.svg'
+  import { onMount, onDestroy, setContext } from 'svelte'
+  import '../app.css'
 
-	let { children } = $props()
-  const socket: WebSocket = new WebSocket("ws://localhost:8000/ws")
-  setContext('socket', socket)
-  
-  onMount(async() => {
-    socket.onopen = () => {
-      console.log("Connected to server")
-    }
-    socket.onmessage = (event) => {
-      const msg = JSON.parse(event.data) as WSMessage
-      switch (msg.type) {
-        case "chat":
-          messages.push(msg.data)
-          break;
-        default:
-          break;
-      }
-    }
-    socket.onclose = () => {
-      console.log("Disconnected")
-    }
-    socket.onerror = (err) => {
-      console.error("Socket error:", err)
-    }
+  import { Game } from '$lib/game/Game'
+  import { createSocket } from '$lib/net/socket'
+
+  let game: Game
+  let container: HTMLDivElement
+
+  let { children } = $props()
+
+  const socket = createSocket("ws://localhost:8000/ws")
+  setContext("socket", socket)
+
+  onMount(async () => {
+    game = new Game()
+    await game.init()
+    game.mount(container)
+  })
+
+  onDestroy(() => {
+    game?.destroy()
+    socket?.close()
   })
 </script>
 
 <svelte:head>
-	<link rel="icon" href={favicon} />
+  <link rel="icon" href={favicon} />
 </svelte:head>
 
-{@render children()}
+<div bind:this={container} class="game-root"></div>
+<div class="ui-layer"> {@render children()} </div>
+
+<style>
+  .game-root {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+  }
+  .ui-layer {
+
+    position: fixed;
+    inset: 0;
+    z-index: 10;
+  }
+</style>

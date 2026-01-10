@@ -1,9 +1,10 @@
 <script lang="ts">
 	import { getContext } from "svelte"
-  import { messages } from "$lib/stores/messages.svelte";
+  import { messages, uiHasFocus } from "$lib/stores/ui.svelte";
 
   let hide: boolean = $state(false)
   let message: string = $state("")
+  let username: string = $state("user")
   const socket: WebSocket = getContext('socket')
   
   function sendMessage() {
@@ -13,8 +14,8 @@
         const iso = now.toISOString();
         const formatted = iso.replace(/-/g, ':').replace('T', ' ').slice(0, 16);
 
-        socket.send(JSON.stringify({ type: "chat", data: "user:" + " " + message + " " + formatted }))
-        message = ""
+        socket.send(JSON.stringify({ type: 'chat', data: `${username}: ${message} ${formatted}`}))
+        message = ''
       }
     }
   }
@@ -23,7 +24,12 @@
 
 <div class="main">
   <div class="game-enter-screen">
-    <button>Enter</button>
+    <div style:color="White">Enter username</div>
+    <input type="text"
+           onfocus={() => uiHasFocus.isFocused = true} 
+           onblur={() => uiHasFocus.isFocused = false} 
+           bind:value={username}>
+    <button style:font-size="1 rem">Enter</button>
   </div>
   <div class="chat-block">
     {#if !hide}
@@ -31,12 +37,15 @@
         {#each messages as msg} <p>{ msg }</p> {/each}
       </div>
       <div class="input-row">
-        <input type="text" bind:value={message}>
-        <button class="btn-send-message" onclick={ sendMessage }>Enter</button>
+        <input type="text"
+               onfocus={() => uiHasFocus.isFocused = true}
+               onblur={() => uiHasFocus.isFocused = false}
+               bind:value={message}>
+        <button class="btn-send-message" onclick={ sendMessage }>send</button>
       </div>
       <button class="btn-hide-chat" onclick={() => hide = !hide}>-</button>
     {:else}
-      <button onclick={() => hide = !hide} style:width="45px">Enter</button>
+      <button onclick={() => hide = !hide} style:max-width="45px">Enter</button>
     {/if}
   </div>
 
@@ -46,8 +55,14 @@
   .main {
     height: 100%;
     position: relative;
+    background: transparent;
     justify-items: center;
     align-content: center;
+  }
+  .game-enter-screen {
+    display: grid;
+    justify-items: center;
+    gap: 4px;
   }
   .chat-block {
     max-width: 240px;
@@ -65,11 +80,11 @@
     max-width: 232px;
     min-height: 100px;
     padding: 4px;
-  
+    color: white;
     text-overflow: clip;
     white-space: normal;
     overflow: auto;
-    background-color: darkgray;
+    background-color: rgba(169, 169, 169, 0.137);
   }
   .input-row {
     display: flex;
@@ -79,7 +94,9 @@
   .input-row input {
     flex: 1;
   }
-
+  .btn-send-message {
+    font-size: 0.5em;
+  }
   .btn-hide-chat {
     position: absolute;
     top: -20px;
