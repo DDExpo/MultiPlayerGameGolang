@@ -4,14 +4,13 @@
   import '../app.css'
 
   import { Game } from '$lib/game/Game'
-  import { createSocket } from '$lib/net/socket'
+  import { socket } from '$lib/net/socket'
 
   let game: Game
   let container: HTMLDivElement
 
   let { children } = $props()
 
-  const socket = createSocket("ws://localhost:8000/ws")
   setContext("socket", socket)
 
   onMount(async () => {
