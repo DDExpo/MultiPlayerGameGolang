@@ -1,21 +1,52 @@
 import { messages } from "$lib/stores/ui.svelte"
-import { playersState } from "$lib/stores/game.svelte"
+import { localUser, playersState } from "$lib/stores/game.svelte"
+import { MsgType } from "$lib/Consts"
+import { readFloat32, readString } from "./binaryEncodingDecoding"
 
-export function createSocket(url: string) {
-  const socket = new WebSocket(url)
+let socket: WebSocket | null = null
 
-  socket.onopen = () => {
-    console.log("Connected")
-  }
+function createSocket(url: string) {
+  if (socket && socket.readyState === WebSocket.OPEN) return socket
 
-  socket.onmessage = (event) => {
-    const msg = JSON.parse(event.data) as WSMessage
-    if (msg.type === "userCords") {
-      const { username, x, y, angle } = msg.data as PlayerMoveMessage
-      playersState[username] = [x, y, angle]
+  socket = new WebSocket(url)
+
+  socket.onopen = () => { console.log("Connected")}
+
+  socket.onmessage = (e) => {
+    if (!(e.data instanceof ArrayBuffer)) {
+      console.error("Expected binary message")
+      return
     }
-    else if (msg.type === "chat") {
-      messages.push(msg.data)
+
+    const buffer = e.data
+    const view = new DataView(buffer)
+
+    const off = { v: 0 }
+    const msgType = view.getUint8(off.v++)
+
+    switch (msgType) {
+      case MsgType.USER_STATE: {
+        const username = readString(view, buffer, off)
+        const x        = readFloat32(view, off)
+        const y        = readFloat32(view, off)
+        const angle    = readFloat32(view, off)
+
+        playersState[username] = [x, y, angle]
+        break
+      }
+      case MsgType.CHAT: {
+        const username  = readString(view, buffer, off)
+        const text      = readString(view, buffer, off)
+        const timestamp = readString(view, buffer, off)
+        messages.push(`${username}: ${text} ${timestamp}`)
+        break
+      }
+
+      case MsgType.USER: {
+        break
+      }
+      default:
+        console.error("Unknown message type:", msgType)
     }
   }
 
@@ -26,7 +57,6 @@ export function createSocket(url: string) {
       wasClean: e.wasClean
     })
   }
-
   socket.onerror = (e) => {
     console.error("Socket error", e)
   }
@@ -34,4 +64,17 @@ export function createSocket(url: string) {
   return socket
 }
 
-export const socket = createSocket("ws://localhost:8000/ws")
+export function initSocket(): WebSocket {
+  const socket = createSocket("ws://localhost:8000/ws")
+  socket.binaryType = "arraybuffer"
+  return socket
+}
+
+export function getSocket(): WebSocket | null {
+  return socket
+}
+
+export function closeSocket() {
+  socket?.close()
+  socket = null
+}

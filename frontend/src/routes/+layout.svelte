@@ -1,19 +1,31 @@
 <script lang="ts">
-  import favicon from '$lib/assets/favicon.svg'
-  import { onMount, onDestroy, setContext } from 'svelte'
   import '../app.css'
-
+  import favicon from '$lib/assets/favicon.svg'
+  import { onMount, onDestroy } from 'svelte'
   import { Game } from '$lib/game/Game'
-  import { socket } from '$lib/net/socket'
+	import { closeSocket, initSocket } from '$lib/net/socket';
+	import { userRegistered } from '$lib/stores/ui.svelte';
+	import { localUser } from '$lib/stores/game.svelte';
 
   let game: Game
   let container: HTMLDivElement
 
   let { children } = $props()
-
-  setContext("socket", socket)
-
+  
   onMount(async () => {
+    
+    fetch("http://localhost:8000/session-resume", { credentials: "include" })
+    .then(res => {
+      if (!res.ok) console.log("Session resume failed")
+      return res.json()
+    })
+    .then(data => {
+      localUser.Username = data.username
+      initSocket()
+      userRegistered.isRegistered = true
+    })
+    .catch(err => console.error(err))
+  
     game = new Game()
     await game.init()
     game.mount(container)
@@ -21,7 +33,7 @@
 
   onDestroy(() => {
     game?.destroy()
-    socket?.close()
+    closeSocket()
   })
 </script>
 

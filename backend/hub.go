@@ -4,7 +4,7 @@ type Hub struct {
 	clients    map[*Client]bool
 	register   chan *Client
 	unregister chan *Client
-	broadcast  chan WSMessage
+	broadcast  chan []byte
 }
 
 func NewHub() *Hub {
@@ -12,7 +12,7 @@ func NewHub() *Hub {
 		clients:    make(map[*Client]bool),
 		register:   make(chan *Client),
 		unregister: make(chan *Client),
-		broadcast:  make(chan WSMessage),
+		broadcast:  make(chan []byte, 1024),
 	}
 }
 

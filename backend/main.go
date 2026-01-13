@@ -1,20 +1,32 @@
 package main
 
 import (
-	"encoding/json"
 	"log"
 	"net/http"
+
+	db "multiplayerGame/database"
 )
 
-type WSMessage struct {
-	Type string          `json:"type"`
-	Data json.RawMessage `json:"data"`
+type LocalUserData struct {
+	localUsername    string
+	currentSessionID string
 }
 
+var LocalData LocalUserData = LocalUserData{localUsername: "", currentSessionID: ""}
+
 func main() {
+	err := db.RunFirstTimeShemas(db.GetDB())
+
+	if err != nil {
+		log.Println(err)
+		panic(err)
+	}
+
 	hub := NewHub()
 	go hub.Run()
 
+	http.HandleFunc("/session-resume", IsSessionResume)
+	http.HandleFunc("/session", InitSession)
 	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
 		ServeWS(hub, w, r)
 	})

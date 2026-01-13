@@ -3,12 +3,13 @@ import { Controller } from "./Controllers"
 import phase1 from "$lib/assets/players/phase1.png"
 import { uiHasFocus, userRegistered } from "$lib/stores/ui.svelte"
 import { localUser, playersState } from "$lib/stores/game.svelte"
-import { socket } from '$lib/net/socket'
+import { createBinaryUserStateMsg } from "$lib/net/binaryEncodingDecoding"
+import { getSocket } from "$lib/net/socket"
 
 
 export class Game {
-  app:   Application
-  world: Container
+  app:              Application
+  world:            Container
   playersContainer: Container
 
   constructor() {
@@ -22,6 +23,8 @@ async init() {
     background: "#000000",
     resizeTo: window,
   })
+
+  const socket = getSocket()
 
   const texture  = await Assets.load(phase1)
   const ccc      = new Sprite(texture)
@@ -42,6 +45,7 @@ async init() {
 
   const controller = new Controller()
   const otherPlayerSprites = new Map<string, Sprite>()
+  let lastPlrWrldX = -134313, lastPlrWrldY = -131331
 
   this.app.ticker.add((t) => {
     if (userRegistered.isRegistered) {
@@ -67,17 +71,22 @@ async init() {
       const cy = this.app.screen.height / 2
       player.position.set(cx, cy)
       
-      if (socket.readyState === WebSocket.OPEN) {
-        socket.send(JSON.stringify({ type: 'userCords', data: {
-          username: localUser.Username,
-          x: playerWorldCords.worldX,
-          y: playerWorldCords.worldY,
-          angle: player.angle
-        }}))
-      }
+        if (socket && socket.readyState === WebSocket.OPEN && userRegistered.isRegistered){
+          if (lastPlrWrldX === playerWorldCords.worldX && lastPlrWrldY === playerWorldCords.worldY) return
+  
+          const msg = createBinaryUserStateMsg(
+            localUser.Username,
+            playerWorldCords.worldX,
+            playerWorldCords.worldY,
+            player.angle
+          )
+          socket.send(msg)
+
+          lastPlrWrldX = playerWorldCords.worldX
+          lastPlrWrldY = playerWorldCords.worldY
+        }
 
       const currentPlayers = new Set<string>()
-      
       for (const [username, [x, y, a]] of Object.entries(playersState)) {
         if (username !== localUser.Username) {
           currentPlayers.add(username)
@@ -90,14 +99,6 @@ async init() {
           }
           sprite.position.set(x, y)
           sprite.angle = a
-        }
-      }
-
-      for (const [username, sprite] of otherPlayerSprites.entries()) {
-        if (!currentPlayers.has(username)) {
-          this.playersContainer.removeChild(sprite)
-          sprite.destroy()
-          otherPlayerSprites.delete(username)
         }
       }
       this.world.position.set(-playerWorldCords.worldX + cx, -playerWorldCords.worldY + cy)

@@ -1,6 +1,6 @@
 type WSMessage<T = any> = {
-    type: string
-    data: T
+  type: string
+  data: T
 }
 
 type PlayerMoveMessage = {

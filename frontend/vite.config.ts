@@ -2,7 +2,16 @@ import { defineConfig } from 'vitest/config';
 import { sveltekit } from '@sveltejs/kit/vite';
 
 export default defineConfig({
-	plugins: [sveltekit()],
+  plugins: [sveltekit()],
+  
+  server: {
+      proxy: {
+          '/ws': {
+              target: 'ws://localhost:8080',
+              ws: true,
+          }
+      }
+  },
 
 	test: {
 		expect: { requireAssertions: true },
