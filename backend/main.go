@@ -7,13 +7,6 @@ import (
 	db "multiplayerGame/database"
 )
 
-type LocalUserData struct {
-	localUsername    string
-	currentSessionID string
-}
-
-var LocalData LocalUserData = LocalUserData{localUsername: "", currentSessionID: ""}
-
 func main() {
 	err := db.RunFirstTimeShemas(db.GetDB())
 
@@ -24,6 +17,7 @@ func main() {
 
 	hub := NewHub()
 	go hub.Run()
+	go hub.RunGameLoop()
 
 	http.HandleFunc("/session-resume", IsSessionResume)
 	http.HandleFunc("/session", InitSession)

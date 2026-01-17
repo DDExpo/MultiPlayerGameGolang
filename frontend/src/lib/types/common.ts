@@ -1,17 +1,4 @@
-type WSMessage<T = any> = {
-  type: string
-  data: T
-}
-
-type PlayerMoveMessage = {
-  username: string
-  x:        number
-  y:        number
-  angle:    number
-}
-
-
 type Username = string
-type Position = [x: number, y: number, angle: number]
+type State = [username: string, x: number, y: number, speed: number, angle: number]
 
-type PlayersState = Record<Username, Position>
+type PlayersState = Record<Username, State>

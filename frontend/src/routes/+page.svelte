@@ -1,13 +1,14 @@
 <script lang="ts">
   import { messages, uiHasFocus, userRegistered } from "$lib/stores/ui.svelte"
   import { MAX_MESSAGE_LENGTH, MAX_USERNAME_LENGTH, MESSAGE_COOLDOWN_MS } from "$lib/Consts";
-  import { localUser, playersState } from "$lib/stores/game.svelte";
+  import { localUser } from "$lib/stores/game.svelte";
   import { createBinaryChatMsg, createBinaryUserMsg } from "$lib/net/binaryEncodingDecoding";
-  import { getSocket, initSocket } from "$lib/net/socket";
+  import { getSocket, initSocket, waitForOpen } from "$lib/net/socket";
+	import { randomBrightColor } from "$lib/utils";
 
 
   let socket: WebSocket | null
-  let hide: boolean                    = $state(false)
+  let hide: boolean                    = $state(true)
   let message: string                  = $state("")
   let error: string                    = $state("")
   let place: string                    = $state("")
@@ -43,7 +44,7 @@
     try {
       const iso = now.toISOString()
       const formatted = iso.replace(/-/g, ':').replace('T', ' ').slice(0, 16)
-      const msg = createBinaryChatMsg(localUser.Username, trimmed, formatted)
+      const msg = createBinaryChatMsg(localUser.Username, trimmed, formatted, localUser.Color)
       socket.send(msg)
       lastTimeMessageSent = now
       message = ""
@@ -55,7 +56,6 @@
     
     if (!trimmed)                             { showError('Username is empty', 'login'); return }
     if (trimmed.length > MAX_USERNAME_LENGTH) { showError(`Username is too long (max ${MAX_USERNAME_LENGTH} characters)`, 'login'); return }
-    if (trimmed in playersState)              { return }
     
     localUser.Username = trimmed
 
@@ -74,27 +74,11 @@
       await waitForOpen(socket)
       socket.send(msg)
       userRegistered.isRegistered = true
+      localUser.Color = randomBrightColor()
     
     } catch (err) { console.error(`Failed: ${err}`)}
   }
 
-  function waitForOpen(socket: WebSocket): Promise<void> {
-    if (socket.readyState === WebSocket.OPEN) return Promise.resolve()
-
-    return new Promise((resolve, reject) => {
-      const onOpen = () => {
-        socket.removeEventListener('open', onOpen)
-        resolve()
-      }
-      const onClose = () => {
-        socket.removeEventListener('open', onOpen)
-        reject(new Error('Socket closed before opening'))
-      }
-
-      socket.addEventListener('open',  onOpen)
-      socket.addEventListener('close', onClose)
-    })
-  }
 </script>
 
 
@@ -115,7 +99,11 @@
   <div class="chat-block">
     {#if !hide}
       <div class="messages-screen">
-        {#each messages as msg} <p>{msg}</p> {/each}
+        {#each messages as [color, [header, msgTime]]}
+          <p>
+            <span style:color={color}> {header} </span> {msgTime}
+          </p>
+        {/each}
       </div>
       <div class="input-row">
         <input type="text"
@@ -128,9 +116,9 @@
       {#if place === "chat"}
         <div class="error-message">{error}</div>
       {/if}
-      <button class="btn-hide-chat" onclick={() => hide = !hide}>-</button>
+      <button class="btn-hide-chat" onclick={() => hide = !hide} style:width="16px" style:height="16px" aria-label="open"></button>
     {:else}
-      <button onclick={() => hide = !hide} style:max-width="45px">Chat</button>
+      <button onclick={() => hide = !hide} style:width="16px" style:height="16px" aria-label="open"></button>
     {/if}
   </div>
 </div>
@@ -150,8 +138,8 @@
     gap: 4px;
   }
   .chat-block {
-    max-width: 240px;
-    min-width: 240px;
+    max-width: 350px;
+    min-width: 350px;
     left: 0;
     bottom: 0;
     margin: 8px;
@@ -162,12 +150,10 @@
   }
 
   .messages-screen {
-    max-width: 232px;
-    min-height: 100px;
+    max-width: 350px;
+    min-height: 150px;
     padding: 4px;
     color: white;
-    text-overflow: clip;
-    white-space: normal;
     overflow: auto;
     font-size: 0.7em;
     background-color: rgba(169, 169, 169, 0.137);

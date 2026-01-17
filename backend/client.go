@@ -1,7 +1,9 @@
 package main
 
 import (
+	"encoding/binary"
 	"log"
+	"math"
 
 	"github.com/gorilla/websocket"
 )
@@ -11,6 +13,7 @@ const (
 	MsgTypeChat          byte = 2
 	MsgTypeUserState     byte = 3
 	MsgTypeResumeSession byte = 4
+	MsgTypeInput         byte = 5
 )
 
 type Client struct {
@@ -18,14 +21,24 @@ type Client struct {
 	hub       *Hub
 	conn      *websocket.Conn
 	send      chan []byte
+	player    *UserState
 }
 
 func NewClient(hub *Hub, conn *websocket.Conn, sessionid string) *Client {
+	player, exists := hub.players[sessionid]
+	if !exists {
+		newPlayer := LocalUserData
+		newPlayer.CurrentSessionID = sessionid
+		player = &newPlayer
+		hub.players[sessionid] = player
+	}
+
 	return &Client{
 		sessionID: sessionid,
 		hub:       hub,
 		conn:      conn,
 		send:      make(chan []byte, 1024),
+		player:    player,
 	}
 }
 func (c *Client) ReadPump() {
@@ -47,8 +60,8 @@ func (c *Client) ReadPump() {
 			c.handleUserRegistration(message[1:])
 		case MsgTypeChat:
 			c.handleChatMessage(message[1:])
-		case MsgTypeUserState:
-			c.handleUserStateMessage(message[1:])
+		case MsgTypeInput:
+			c.handleUserInput(message[1:])
 		case MsgTypeResumeSession:
 			c.handleUserResumeSession(message[1:])
 		default:
@@ -71,21 +84,38 @@ func (c *Client) WritePump() {
 }
 
 func (c *Client) handleUserRegistration(data []byte) {
-	LocalData.localUsername = string(data)
+	LocalUserData.Username = string(data)
+	msg := SerializeUserStateDelta(&LocalUserData, UserStateDeltaPOS|UserStateDeltaSTATS|UserStateDeltaWEAPON)
+	c.hub.broadcast <- msg
 }
 func (c *Client) handleChatMessage(data []byte) {
 	msg := append([]byte{MsgTypeChat}, data...)
 	c.hub.broadcast <- msg
 }
-func (c *Client) handleUserStateMessage(data []byte) {
-	if len(data) < 13 {
-		log.Println("user state message too short")
-		return
+
+func (c *Client) handleUserInput(data []byte) {
+
+	offset := 0
+	seq := binary.LittleEndian.Uint16(data[offset:])
+	offset += 2
+	moveX := int8(data[offset])
+	offset++
+	moveY := int8(data[offset])
+	offset++
+	angle := math.Float32frombits(binary.LittleEndian.Uint32(data[offset:]))
+	offset += 4
+
+	dash := data[offset] != 0
+
+	c.player.Input = PlayerInput{
+		Seq:   seq,
+		MoveX: moveX,
+		MoveY: moveY,
+		Dash:  dash,
+		Angle: angle,
 	}
-	msg := append([]byte{MsgTypeUserState}, data...)
-	c.hub.broadcast <- msg
 }
 func (c *Client) handleUserResumeSession(data []byte) {
-	msg := append([]byte{MsgTypeResumeSession}, data...)
+	msg := SerializeUserStateDelta(&LocalUserData, UserStateDeltaPOS|UserStateDeltaSTATS|UserStateDeltaWEAPON)
 	c.hub.broadcast <- msg
 }

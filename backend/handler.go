@@ -39,7 +39,7 @@ func IsSessionResume(w http.ResponseWriter, r *http.Request) {
 	username, timeRegistered, dbErr := db.DBGetUser(db.GetDB(), cookie.Value)
 	if dbErr != nil {
 		log.Printf("DB lookup failed for session %s: %v", cookie.Value, dbErr)
-		LocalData.currentSessionID = ""
+		LocalUserData.CurrentSessionID = ""
 		http.Error(w, "internal error", 400)
 		return
 	}
@@ -49,13 +49,13 @@ func IsSessionResume(w http.ResponseWriter, r *http.Request) {
 
 	if age > MaxAgeSession {
 		log.Printf("Session expired")
-		LocalData.currentSessionID = ""
+		LocalUserData.CurrentSessionID = ""
 		http.Error(w, "internal error", 400)
 		return
 	}
 
-	LocalData.currentSessionID = cookie.Value
-	LocalData.localUsername = username
+	LocalUserData.CurrentSessionID = cookie.Value
+	LocalUserData.Username = username
 
 	resp := SessionRequestUsername{Username: username}
 	w.WriteHeader(http.StatusOK)
@@ -89,30 +89,32 @@ func InitSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sessionID, err := generateSessionID()
-	if err != nil {
-		http.Error(w, "internal error", 500)
-		return
+	if LocalUserData.CurrentSessionID == "" {
+		sessionID, err := generateSessionID()
+		if err != nil {
+			http.Error(w, "internal error", 500)
+			return
+		}
+
+		LocalUserData.CurrentSessionID = sessionID
+		log.Printf("Creating new session (HTTP): %s", sessionID)
+		http.SetCookie(w, &http.Cookie{
+			Name:     "session_id",
+			Value:    sessionID,
+			Path:     "/",
+			HttpOnly: true,
+			Secure:   false,
+			SameSite: http.SameSiteLaxMode,
+			MaxAge:   MaxAgeSession,
+		})
 	}
 
-	LocalData.currentSessionID = sessionID
-	log.Printf("Creating new session (HTTP): %s", sessionID)
-	http.SetCookie(w, &http.Cookie{
-		Name:     "session_id",
-		Value:    sessionID,
-		Path:     "/",
-		HttpOnly: true,
-		Secure:   false,
-		SameSite: http.SameSiteLaxMode,
-		MaxAge:   MaxAgeSession,
-	})
-
 	user := db.UserData{
-		ID:             sessionID,
+		ID:             LocalUserData.CurrentSessionID,
 		Username:       req.Username,
 		TimeRegistered: time.Now().Unix(),
 	}
-	err = db.DBSaveUser(db.GetDB(), user)
+	err := db.DBSaveUser(db.GetDB(), user)
 	if err != nil {
 		log.Println(err)
 	}
@@ -128,7 +130,7 @@ func ServeWS(hub *Hub, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	client := NewClient(hub, conn, LocalData.currentSessionID)
+	client := NewClient(hub, conn, LocalUserData.CurrentSessionID)
 	hub.register <- client
 
 	go client.WritePump()

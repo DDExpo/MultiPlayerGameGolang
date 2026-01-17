@@ -1,4 +1,5 @@
 import { MsgType } from "$lib/Consts"
+import { inputSeq } from "$lib/stores/game.svelte"
 
 export function createBinaryUserMsg(username: string): ArrayBuffer {
   const encoder   = new TextEncoder()
@@ -9,61 +10,81 @@ export function createBinaryUserMsg(username: string): ArrayBuffer {
   // 1 byte type + 1 length + username
   let offset   = 0
 
-  view.setUint8(offset++, MsgType.USER)
+  view.setUint8(offset++, MsgType.USER_REG)
   view.setUint8(offset++, userBytes.length)
   new Uint8Array(buffer, offset).set(userBytes)
   return buffer
 }
 
-export function createBinaryChatMsg(username: string, text: string, timestamp: string): ArrayBuffer {
+export function createBinaryChatMsg(username: string, text: string, timestamp: string, color: string): ArrayBuffer {
   const encoder = new TextEncoder()
   const userBytes = encoder.encode(username)
-  const t = encoder.encode(text)
-  const ts = encoder.encode(timestamp)
+  const textBytes = encoder.encode(text)
+  const tsBytes = encoder.encode(timestamp)
+  const colorBytes = encoder.encode(color)
 
-  // 1 (type) + (1 + userBytes.length) username + (1 + t.length) text + (1 + ts.length) timestamp
-  const buffer = new ArrayBuffer(1 + (1 + userBytes.length) + (1 + t.length) + (1 + ts.length))
+  // 1(type)
+  // + 1 + username
+  // + 1 + text
+  // + 1 + timestamp
+  // + 1 + color
+  const buffer = new ArrayBuffer(
+    1 +
+    (1 + userBytes.length) +
+    (1 + textBytes.length) +
+    (1 + tsBytes.length) +
+    (1 + colorBytes.length)
+  )
+
   const view = new DataView(buffer)
-
   let offset = 0
-  view.setUint8(offset++, MsgType.CHAT)
+
+  view.setUint8(offset++, MsgType.USER_CHAT)
+
   view.setUint8(offset++, userBytes.length)
   new Uint8Array(buffer, offset, userBytes.length).set(userBytes)
-
   offset += userBytes.length
-  view.setUint8(offset++, t.length)
-  new Uint8Array(buffer, offset, t.length).set(t)
 
-  offset += t.length
-  view.setUint8(offset++, ts.length)
-  new Uint8Array(buffer, offset, ts.length).set(ts)
+  view.setUint8(offset++, textBytes.length)
+  new Uint8Array(buffer, offset, textBytes.length).set(textBytes)
+  offset += textBytes.length
+
+  view.setUint8(offset++, tsBytes.length)
+  new Uint8Array(buffer, offset, tsBytes.length).set(tsBytes)
+  offset += tsBytes.length
+
+  view.setUint8(offset++, color.length)
+  new Uint8Array(buffer, offset, color.length).set(colorBytes)
+  offset += colorBytes.length
 
   return buffer
 }
 
-export function createBinaryUserStateMsg(username: string, x: number, y: number, angle: number): ArrayBuffer {
-  const encoder   = new TextEncoder()
-  const userBytes = encoder.encode(username)
-  const buffer = new ArrayBuffer(1 + 1 + userBytes.length + 12)
-  const view   = new DataView(buffer)
-  
-  // 1 byte type  + 1 length + username + 4 (x) + 4 (y) + 4 (angle)
-  let offset = 0
+export function createInputMsg(dx: number, dy: number, isDash: boolean, angle: number) {
+  const buffer = new ArrayBuffer(1 + 2 + 1 + 1 + 4 + 1)
+  const view = new DataView(buffer)
+  let o = 0
 
-  view.setUint8(offset++, MsgType.USER_STATE)
-  view.setUint8(offset++, userBytes.length)
-  new Uint8Array(buffer, offset, userBytes.length).set(userBytes)
-  offset += userBytes.length
-
-  view.setFloat32(offset, x, true); offset += 4
-  view.setFloat32(offset, y, true); offset += 4
-  view.setFloat32(offset, angle, true)
+  view.setUint8(o++, MsgType.USER_INPUT)
+  view.setUint16(o, ++inputSeq.value, true)
+  o += 2
+  view.setInt8(o++, dx)
+  view.setInt8(o++, dy)
+  view.setFloat32(o, angle, true)
+  o += 4  
+  view.setUint8(o++, isDash ? 1 : 0)
 
   return buffer
 }
 
 export function readFloat32(view: DataView, offsetRef: { v: number }): number {
   const value = view.getFloat32(offsetRef.v, true)
+  offsetRef.v += 4
+  return value
+}
+
+export function readInt32(view: DataView, offsetRef: { v: number }): number {
+  const value = view.getInt32(offsetRef.v, true)
   offsetRef.v += 4
   return value
 }
