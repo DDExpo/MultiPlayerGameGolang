@@ -2,8 +2,8 @@
 export const WORLD_WIDTH  = 8000
 export const WORLD_HEIGHT = 8000
 
-export const MAX_USERNAME_LENGTH = 100
-export const MAX_MESSAGE_LENGTH  = 500
+export const MAX_USERNAME_LENGTH = 128
+export const MAX_MESSAGE_LENGTH  = 512
 export const MESSAGE_COOLDOWN_MS = 15_000
 
 

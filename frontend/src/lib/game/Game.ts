@@ -62,6 +62,7 @@ export class Game {
     this.world.addChild(this.projectilesContainer)
     this.world.addChild(this.playersContainer)
     const controller = new Controller()
+    const otherPlayerSprites = new Map<string, [Sprite, Text]>()
     
     this.createStarfield()
     this.world.addChild(this.starfield)
@@ -78,18 +79,15 @@ export class Game {
     player.x = this.app.screen.width  / 2
     player.y = this.app.screen.height / 2
     this.app.stage.addChild(player)
-    
-    this.world.addChild(this.playersContainer)
-    
+
     this.app.stage.addChild(this.world)
-    const otherPlayerSprites = new Map<string, [Sprite, Text]>()
     
     const userName = new Text({
       text: ClientData.Username,
       style: new TextStyle({ fontSize: 10, fontFamily: "PixelUI", fill: ClientData.Color}),
       resolution: 2,
     })
-    this.app.stage.addChild(userName)
+    this.world.addChild(userName)
     
     this.app.ticker.add((t) => {
       if (userRegistered.isRegistered) {
@@ -158,6 +156,7 @@ export class Game {
         }}
         if (!playersState) return
         const [sx, sy, spd, ang] = playersState[ClientData.Username]
+
         playerWorldCords.X = sx
         playerWorldCords.Y = sy
         userName.x = sx - userName.width / 2

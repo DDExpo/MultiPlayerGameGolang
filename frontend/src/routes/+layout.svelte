@@ -5,7 +5,7 @@
   import { Game } from '$lib/game/Game'
 	import { closeSocket, initSocket, waitForOpen } from '$lib/net/socket';
 	import { userRegistered } from '$lib/stores/ui.svelte';
-	import { ClientData } from '$lib/stores/game.svelte';
+	import { ClientData, playersState } from '$lib/stores/game.svelte';
 	import { MsgType } from '$lib/Consts';
 	import { randomBrightColor } from '$lib/utils';
 
@@ -26,12 +26,13 @@
         const view = new DataView(buffer)
         view.setUint8(0, MsgType.USER_RESUME)
         socket.send(buffer)
-        
-        setTimeout(() => {}, 1000)
 
-        userRegistered.isRegistered = true
+        const data = await res.json()
+        ClientData.Username = data.username
         ClientData.Color = randomBrightColor()
+        playersState[ClientData.Username] = [4000, 4000, 0, 0]
         console.log("Session resumed")
+        userRegistered.isRegistered = true
       } else {
         console.log("No valid session - user needs to login")
       }

@@ -51,7 +51,7 @@ func (c *Client) ReadPump() {
 		case MsgTypeUser:
 			c.handleUserRegistration()
 		case MsgTypeChat:
-			c.handleChatMessage(message)
+			c.handleChatMessage(message[1:])
 		case MsgTypeInput:
 			c.handleUserInput(message[1:])
 		case MsgTypeResumeSession:

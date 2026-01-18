@@ -35,7 +35,6 @@ function createSocket(url: string) {
           speed = view.getUint8(off.v++)
           angle = readFloat32(view, off)
           playersState[username] = [x, y, speed, angle]
-          console.log(playersState)
         }
 
         if (username === ClientData.Username) {

@@ -3,8 +3,8 @@ package main
 import "time"
 
 const MinUsernameLength = 1
-const MaxUsernameLength = 100
-const MaxUserMsgLength = 500
+const MaxUsernameLength = 128
+const MaxUserMsgLength = 512
 const MaxAgeSession = 60 * 60 * 12
 
 const TickRate = 60

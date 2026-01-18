@@ -78,7 +78,11 @@ func IsSessionResume(h *Hub, w http.ResponseWriter, r *http.Request) {
 		MaxAge:   MaxAgeSession,
 	})
 
+	resp := map[string]string{"username": username}
 	w.WriteHeader(http.StatusOK)
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		log.Printf("Failed to write JSON response: %v", err)
+	}
 
 	log.Printf("Session resumed: %s", username)
 }
