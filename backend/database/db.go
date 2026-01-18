@@ -21,9 +21,10 @@ func GetDB() *sqlx.DB {
 	return db
 }
 
-func DbDelete(DB *sqlx.DB, ids []string, table string) error {
+func DbDelete(DB *sqlx.DB, ids []string) error {
+	defer DB.Close()
 
-	query, args, err := sqlx.In("DELETE FROM "+table+" WHERE id IN (?)", ids)
+	query, args, err := sqlx.In("DELETE FROM users WHERE id IN (?)", ids)
 	if err != nil {
 		return err
 	}
@@ -33,6 +34,8 @@ func DbDelete(DB *sqlx.DB, ids []string, table string) error {
 }
 
 func DBGetUser(DB *sqlx.DB, sessionID string) (string, int64, error) {
+	defer DB.Close()
+
 	row := DB.QueryRow("SELECT id, username, timeRegistered FROM users WHERE id = ?", sessionID)
 
 	var id string
@@ -46,6 +49,8 @@ func DBGetUser(DB *sqlx.DB, sessionID string) (string, int64, error) {
 }
 
 func DBSaveUser(DB *sqlx.DB, user UserData) error {
+	defer DB.Close()
+
 	tx, err := DB.Beginx()
 	if err != nil {
 		return err
@@ -65,13 +70,15 @@ func DBSaveUser(DB *sqlx.DB, user UserData) error {
 	return tx.Commit()
 }
 
-func RunFirstTimeShemas(db *sqlx.DB) error {
+func RunFirstTimeShemas(DB *sqlx.DB) error {
+	defer DB.Close()
+
 	schemaUsers := `CREATE TABLE IF NOT EXISTS users (
 		id TEXT PRIMARY KEY,
 		username TEXT,
 		timeRegistered BIGINT
 	);`
-	_, err := db.Exec(schemaUsers)
+	_, err := DB.Exec(schemaUsers)
 	if err != nil {
 		return fmt.Errorf("error on executing schemaUsers: %v", err)
 	}

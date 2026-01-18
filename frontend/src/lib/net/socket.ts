@@ -1,7 +1,8 @@
 import { messages } from "$lib/stores/ui.svelte"
-import { localUser, playersState } from "$lib/stores/game.svelte"
-import { MsgType, UserStateDelta } from "$lib/Consts"
-import { readFloat32, readString } from "./binaryEncodingDecoding"
+import { ClientData, playersState } from "$lib/stores/game.svelte"
+import { MsgType } from "$lib/Consts"
+import { UserStateDelta } from "$lib/types/enums"
+import { readFloat32, readString } from "./deserialzie"
 
 let socket: WebSocket | null = null
 
@@ -16,19 +17,16 @@ function createSocket(url: string) {
       console.error("Expected binary message")
       return
     }
-
       const buffer = e.data
       const view = new DataView(buffer)
 
       const off = { v: 0 }
       const msgType = view.getUint8(off.v++)
 
-
       switch (msgType) {
         case MsgType.USER_STATE: {
         const deltaMask = view.getUint8(off.v++)
         const username  = readString(view, buffer, off)
-        const id       = readString(view, buffer, off)
         let x, y, speed, angle
 
         if (deltaMask & UserStateDelta.POS) { 
@@ -36,21 +34,21 @@ function createSocket(url: string) {
           y     = readFloat32(view, off)
           speed = view.getUint8(off.v++)
           angle = readFloat32(view, off)
-          playersState[id] = [username, x, y, speed, angle]
+          playersState[username] = [x, y, speed, angle]
+          console.log(playersState)
         }
 
-        if (username === localUser.Username) {
-          localUser.ID = id
+        if (username === ClientData.Username) {
           if (deltaMask & UserStateDelta.STATS) {
-            localUser.Hp     = view.getUint8(off.v++)
-            localUser.Kills  = view.getUint8(off.v++)
-            localUser.Damage = view.getUint8(off.v++)
+            ClientData.Hp     = view.getUint8(off.v++)
+            ClientData.Kills  = view.getUint8(off.v++)
+            ClientData.Damage = view.getUint8(off.v++)
           }
 
           if (deltaMask & UserStateDelta.WEAPON) {
-            localUser.WeaponType  = view.getUint8(off.v++)
-            localUser.WeaponWidth = view.getUint8(off.v++)
-            localUser.WeaponRange = view.getUint8(off.v++)
+            ClientData.WeaponType  = view.getUint8(off.v++)
+            ClientData.WeaponWidth = view.getUint8(off.v++)
+            ClientData.WeaponRange = view.getUint8(off.v++)
           }
         }
         break
@@ -83,7 +81,7 @@ function createSocket(url: string) {
 }
 
 export function initSocket(): WebSocket {
-  const socket = createSocket("ws://localhost:8000/ws")
+  socket = createSocket("ws://localhost:8000/ws")
   socket.binaryType = "arraybuffer"
   return socket
 }

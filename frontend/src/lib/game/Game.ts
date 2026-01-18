@@ -2,12 +2,12 @@ import { Application, Assets, Text, Container, BlurFilter, Graphics, Sprite, Tex
 import { Controller } from "./Controllers"
 import phase1 from "$lib/assets/players/phase1.png"
 import { uiHasFocus, userRegistered } from "$lib/stores/ui.svelte"
-import { localUser, playersState } from "$lib/stores/game.svelte"
-import { createInputMsg } from "$lib/net/binaryEncodingDecoding"
+import { ClientData, playersState } from "$lib/stores/game.svelte"
 import { getSocket } from "$lib/net/socket"
 import { WORLD_HEIGHT, WORLD_WIDTH } from "$lib/Consts"
 import { randomBrightColor } from "$lib/utils"
 import { ProjectilePool } from "./Projectiles"
+import { serializeInputMsg } from "$lib/net/serialize"
 
 
 export class Game {
@@ -62,7 +62,6 @@ export class Game {
     this.world.addChild(this.projectilesContainer)
     this.world.addChild(this.playersContainer)
     const controller = new Controller()
-    const socket = getSocket()
     
     this.createStarfield()
     this.world.addChild(this.starfield)
@@ -71,8 +70,8 @@ export class Game {
     bounds.rect(0, 0, WORLD_WIDTH, WORLD_HEIGHT).stroke({ width: 12, color: 0xff0000 })
     this.world.addChild(bounds)
     
-    const texture  = await Assets.load(phase1)
-    const player = new Sprite(texture)
+    const texture = await Assets.load(phase1)
+    const player  = new Sprite(texture)
     const playerWorldCords = { X: 0, Y: 0 }
     player.anchor.set(0.5)
     player.scale.set(0.3)
@@ -84,16 +83,17 @@ export class Game {
     
     this.app.stage.addChild(this.world)
     const otherPlayerSprites = new Map<string, [Sprite, Text]>()
-
+    
     const userName = new Text({
-      text: localUser.Username,
-      style: new TextStyle({ fontSize: 10, fontFamily: "PixelUI", fill: localUser.Color}),
+      text: ClientData.Username,
+      style: new TextStyle({ fontSize: 10, fontFamily: "PixelUI", fill: ClientData.Color}),
       resolution: 2,
     })
     this.app.stage.addChild(userName)
-
+    
     this.app.ticker.add((t) => {
       if (userRegistered.isRegistered) {
+        const socket = getSocket()
         let dx = 0, dy = 0
         
         if (controller.keys.space.pressed ) {
@@ -104,10 +104,10 @@ export class Game {
               playerWorldCords.Y, 
               player.angle,
               10,
-              localUser.ID,
-              localUser.Damage,
-              1,
-              1,
+              ClientData.Username,
+              ClientData.Damage,
+              ClientData.WeaponRange,
+              ClientData.WeaponWidth,
             )
             this.lastShotTime = now
           }
@@ -121,25 +121,20 @@ export class Game {
           if (controller.keys.down.pressed)  dy += 1
         }
 
-        const speed = controller.checkDoubleTap.pressed ? 2 : 1
-        if (dx !== 0 || dy !== 0) {
-          player.angle = Math.atan2(dy, dx) * (180 / Math.PI) + 90
-          playerWorldCords.X += dx * speed
-          playerWorldCords.Y += dy * speed
-        }
+        player.angle = Math.atan2(dy, dx) * (180 / Math.PI) + 90
 
         if (socket && socket.readyState === WebSocket.OPEN) {
-          const msg = createInputMsg(dx, dy, controller.checkDoubleTap.pressed, player.angle)
+          const msg = serializeInputMsg(dx, dy, controller.checkDoubleTap.pressed, player.angle)
           socket.send(msg)
         }
         const cx = this.app.screen.width  / 2
         const cy = this.app.screen.height / 2
         player.position.set(cx, cy)
 
-        for (const [id, [usr, x, y, a]] of Object.entries(playersState)) {
-          if (id !== localUser.ID) {
+        for (const [usr, [x, y, a]] of Object.entries(playersState)) {
+          if (usr !== ClientData.Username) {
             
-            const entry = otherPlayerSprites.get(id)
+            const entry = otherPlayerSprites.get(usr)
             if (!entry) {
               const sprite = new Sprite(texture)
               sprite.anchor.set(0.5)
@@ -153,20 +148,20 @@ export class Game {
               textUser.anchor.set(0.5, 1)
               this.playersContainer.addChild(sprite)
               this.playersContainer.addChild(textUser)
-              otherPlayerSprites.set(id, [sprite, textUser])
+              otherPlayerSprites.set(usr, [sprite, textUser])
             }
 
-            const [sprite, textUser] = otherPlayerSprites.get(id)!
+            const [sprite, textUser] = otherPlayerSprites.get(usr)!
             sprite.position.set(x, y)
             sprite.angle = a
             textUser.position.set(x, y + 16)
         }}
-        
-        const [usr, sx, sy, spd, ang] = playersState[localUser.ID]
+        if (!playersState) return
+        const [sx, sy, spd, ang] = playersState[ClientData.Username]
         playerWorldCords.X = sx
         playerWorldCords.Y = sy
-        userName.x = cx - userName.width / 2
-        userName.y = cy + 16
+        userName.x = sx - userName.width / 2
+        userName.y = sy + 16
         player.angle = ang
         
         this.world.position.set(-playerWorldCords.X + cx, -playerWorldCords.Y + cy)

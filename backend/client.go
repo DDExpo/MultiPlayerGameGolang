@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"log"
 	"math"
+	"time"
 
 	"github.com/gorilla/websocket"
 )
@@ -17,28 +18,19 @@ const (
 )
 
 type Client struct {
-	sessionID string
-	hub       *Hub
-	conn      *websocket.Conn
-	send      chan []byte
-	player    *UserState
+	hub    *Hub
+	conn   *websocket.Conn
+	send   chan []byte
+	player *Player
 }
 
-func NewClient(hub *Hub, conn *websocket.Conn, sessionid string) *Client {
-	player, exists := hub.players[sessionid]
-	if !exists {
-		newPlayer := LocalUserData
-		newPlayer.CurrentSessionID = sessionid
-		player = &newPlayer
-		hub.players[sessionid] = player
-	}
+func NewClient(hub *Hub, conn *websocket.Conn, player *Player) *Client {
 
 	return &Client{
-		sessionID: sessionid,
-		hub:       hub,
-		conn:      conn,
-		send:      make(chan []byte, 1024),
-		player:    player,
+		hub:    hub,
+		conn:   conn,
+		send:   make(chan []byte, 1024),
+		player: player,
 	}
 }
 func (c *Client) ReadPump() {
@@ -57,13 +49,13 @@ func (c *Client) ReadPump() {
 		}
 		switch message[0] {
 		case MsgTypeUser:
-			c.handleUserRegistration(message[1:])
+			c.handleUserRegistration()
 		case MsgTypeChat:
-			c.handleChatMessage(message[1:])
+			c.handleChatMessage(message)
 		case MsgTypeInput:
 			c.handleUserInput(message[1:])
 		case MsgTypeResumeSession:
-			c.handleUserResumeSession(message[1:])
+			c.handleUserResumeSession()
 		default:
 			log.Printf("unknown message type: %d", message[0])
 		}
@@ -83,13 +75,18 @@ func (c *Client) WritePump() {
 	}
 }
 
-func (c *Client) handleUserRegistration(data []byte) {
-	LocalUserData.Username = string(data)
-	msg := SerializeUserStateDelta(&LocalUserData, UserStateDeltaPOS|UserStateDeltaSTATS|UserStateDeltaWEAPON)
+func (c *Client) handleUserRegistration() {
+	msg := SerializeUserStateDelta(c.player, UserStateDeltaPOS|UserStateDeltaSTATS|UserStateDeltaWEAPON)
 	c.hub.broadcast <- msg
 }
+
 func (c *Client) handleChatMessage(data []byte) {
-	msg := append([]byte{MsgTypeChat}, data...)
+	text, color, err := DeserializeUserMsg(data)
+	if err != nil {
+		log.Printf("Problem with deserializing user text: %s color: %s err: %v", text, color, err)
+	}
+
+	msg := SerializeUserMsg(c.player.Meta.Username, text, time.Now().UTC().Format("2006-01-02 15:04"), color)
 	c.hub.broadcast <- msg
 }
 
@@ -106,7 +103,6 @@ func (c *Client) handleUserInput(data []byte) {
 	offset += 4
 
 	dash := data[offset] != 0
-
 	c.player.Input = PlayerInput{
 		Seq:   seq,
 		MoveX: moveX,
@@ -115,7 +111,7 @@ func (c *Client) handleUserInput(data []byte) {
 		Angle: angle,
 	}
 }
-func (c *Client) handleUserResumeSession(data []byte) {
-	msg := SerializeUserStateDelta(&LocalUserData, UserStateDeltaPOS|UserStateDeltaSTATS|UserStateDeltaWEAPON)
+func (c *Client) handleUserResumeSession() {
+	msg := SerializeUserStateDelta(c.player, UserStateDeltaPOS|UserStateDeltaSTATS|UserStateDeltaWEAPON)
 	c.hub.broadcast <- msg
 }

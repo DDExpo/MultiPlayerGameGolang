@@ -3,9 +3,9 @@
   import favicon from '$lib/assets/favicon.svg'
   import { onMount, onDestroy } from 'svelte'
   import { Game } from '$lib/game/Game'
-	import { closeSocket, initSocket, getSocket, waitForOpen } from '$lib/net/socket';
+	import { closeSocket, initSocket, waitForOpen } from '$lib/net/socket';
 	import { userRegistered } from '$lib/stores/ui.svelte';
-	import { localUser } from '$lib/stores/game.svelte';
+	import { ClientData } from '$lib/stores/game.svelte';
 	import { MsgType } from '$lib/Consts';
 	import { randomBrightColor } from '$lib/utils';
 
@@ -15,27 +15,30 @@
   let { children } = $props()
   
   onMount(async () => {
+    try {
+      const res = await fetch("http://localhost:8000/session-resume", { credentials: "include" })
+      if (res.ok) {
+        
+        const socket = initSocket()
+        await waitForOpen(socket)
+        
+        const buffer = new ArrayBuffer(1)
+        const view = new DataView(buffer)
+        view.setUint8(0, MsgType.USER_RESUME)
+        socket.send(buffer)
+        
+        setTimeout(() => {}, 1000)
+
+        userRegistered.isRegistered = true
+        ClientData.Color = randomBrightColor()
+        console.log("Session resumed")
+      } else {
+        console.log("No valid session - user needs to login")
+      }
+    } catch (err) {
+      console.error("Session resume failed:", err)
+    }
     
-    fetch("http://localhost:8000/session-resume", { credentials: "include" })
-    .then(res => {
-      if (!res.ok) console.log("Session resume failed")
-      return res.json()
-    })
-    .then(async data => {
-      initSocket()
-      const buffer = new ArrayBuffer(1)
-      const view = new DataView(buffer)
-      view.setUint8(0, MsgType.USER_RESUME)
-      
-      const socket = getSocket()
-      await waitForOpen(socket!)
-      socket!.send(view)
-      localUser.Color = randomBrightColor()
-      localUser.Username = data.username
-      userRegistered.isRegistered = true
-    })
-    .catch(err => console.error(err))
-  
     game = new Game()
     await game.init()
     game.mount(container)
@@ -57,11 +60,11 @@
 <div class="ui-layer"> {@render children()} </div>
 <div class="player-stats">
   <div>
-    HP { localUser.Hp }
+    HP { ClientData.Hp }
   </div>
   <div>
     <img src="/skull.webp" width="48" alt="skull-webp">
-    { localUser.Kills }
+    { ClientData.Kills }
   </div>
 </div>
 

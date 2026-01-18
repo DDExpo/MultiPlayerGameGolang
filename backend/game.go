@@ -1,25 +1,25 @@
 package main
 
-func applyInput(p *UserState, dt float32) {
+func applyInput(p *Player, dt float32) {
 
 	if p.Input.Dash {
-		p.Speed = 2
+		p.Movements.Speed = 2
 	} else {
-		p.Speed = 1
+		p.Movements.Speed = 1
 	}
 
-	moveSpeed := float32(p.Speed) * 60.0
+	moveSpeed := float32(p.Movements.Speed) * 60.0
 
-	p.X += float32(int8(p.Input.MoveX)) * moveSpeed * dt
-	p.Y += float32(int8(p.Input.MoveY)) * moveSpeed * dt
+	p.Movements.X += float32(int8(p.Input.MoveX)) * moveSpeed * dt
+	p.Movements.Y += float32(int8(p.Input.MoveY)) * moveSpeed * dt
 
-	p.Angle = p.Input.Angle
+	p.Movements.Angle = p.Input.Angle
 }
 
-func clampToWorld(p *UserState) {
+func clampToWorld(p *Player) {
 
-	if p.X < 0 || p.Y < 0 || p.X > WorldWidth || p.Y > WorldHeight {
-		p.X = 4000
-		p.Y = 4000
+	if p.Movements.X < 0 || p.Movements.Y < 0 || p.Movements.X > WorldWidth || p.Movements.Y > WorldHeight {
+		p.Movements.X = 4000
+		p.Movements.Y = 4000
 	}
 }
