@@ -1,8 +1,9 @@
-import { messages } from "$lib/stores/ui.svelte"
-import { ClientData, playersState } from "$lib/stores/game.svelte"
+import { messages, userRegistered } from "$lib/stores/ui.svelte"
+import { ClientData, otherProjectiles, playersState } from "$lib/stores/game.svelte"
 import { MsgType } from "$lib/Consts"
 import { UserStateDelta } from "$lib/types/enums"
 import { readFloat32, readString } from "./deserialzie"
+import { FastProjectileCheck } from "$lib/game/optimizations"
 
 let socket: WebSocket | null = null
 
@@ -27,14 +28,15 @@ function createSocket(url: string) {
         case MsgType.USER_STATE: {
         const deltaMask = view.getUint8(off.v++)
         const username  = readString(view, buffer, off)
-        let x, y, speed, angle
+        let x, y, angle
 
         if (deltaMask & UserStateDelta.POS) { 
           x     = readFloat32(view, off)
           y     = readFloat32(view, off)
-          speed = view.getUint8(off.v++)
           angle = readFloat32(view, off)
-          playersState[username] = [x, y, speed, angle]
+
+          playersState[username] = [x, y, angle]
+          FastProjectileCheck.update(username, x, y)
         }
 
         if (username === ClientData.Username) {
@@ -50,6 +52,23 @@ function createSocket(url: string) {
             ClientData.WeaponRange = view.getUint8(off.v++)
           }
         }
+        break
+      }
+      case MsgType.USER_SHOOT: {
+        let _           = view.getUint8(off.v++)
+        const username  = readString(view, buffer, off)
+        if (username !== ClientData.Username) {
+            const x           = readFloat32(view, off)
+            const y           = readFloat32(view, off)
+            const angle       = readFloat32(view, off)
+            let _             = view.getUint8(off.v++)
+            let __            = view.getUint8(off.v++)
+            const damage      = view.getUint8(off.v++)
+            let ___           = view.getUint8(off.v++)
+            const weaponWidth = view.getUint8(off.v++)
+            const weaponRange = view.getUint8(off.v++)
+            otherProjectiles[username] = [x, y, angle, damage, weaponWidth, weaponRange]
+          }
         break
       }
       case MsgType.USER_CHAT: {
@@ -71,6 +90,9 @@ function createSocket(url: string) {
       reason: e.reason,
       wasClean: e.wasClean
     })
+
+    FastProjectileCheck.remove(ClientData.Username)
+    delete playersState[ClientData.Username]
   }
   socket.onerror = (e) => {
     console.error("Socket error", e)

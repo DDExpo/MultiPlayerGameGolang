@@ -37,7 +37,7 @@ func (h *Hub) RunGameLoop() {
 			clampToWorld(p)
 			deltaMask := computeDeltaMask(p)
 			if deltaMask != 0 {
-				msg := SerializeUserStateDelta(p, deltaMask)
+				msg := SerializeUserStateDelta(MsgTypeUserState, p, deltaMask)
 				h.broadcast <- msg
 				updateLastSent(p, deltaMask)
 			}

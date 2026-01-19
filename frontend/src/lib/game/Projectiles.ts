@@ -1,17 +1,22 @@
-import { WORLD_HEIGHT, WORLD_WIDTH } from "$lib/Consts"
+import { PROJECTILE_LIFE_FRAMES, PROJECTILE_SPEED, WORLD_HEIGHT, WORLD_WIDTH } from "$lib/Consts"
 import { Container, Graphics } from "pixi.js"
+import { FastProjectileCheck } from "./optimizations"
+import { getSocket } from "$lib/net/socket"
 
 export class Projectile {
   sprite:   Graphics
   vx:       number
   vy:       number
   lifetime: number
-  damage:   number
   ownerId:  string
+  damage:   number
+  width:  number
+  range:  number
 
-  constructor(x: number, y: number, angle: number, speed: number, ownerId: string, damage: number) {
+
+  constructor(x: number, y: number, angle: number, speed: number, ownerId: string, damage: number, width: number, range: number) {
     this.sprite = new Graphics()
-    this.sprite.circle(0, 0, 3).fill({ color: 0xffffff })
+    this.sprite.circle(0, 0, 3 * width).fill({ color: 0xffffff })
     this.sprite.position.set(x, y)
     this.sprite.angle = angle
   
@@ -22,20 +27,39 @@ export class Projectile {
     this.lifetime = 0
     this.damage   = damage
     this.ownerId  = ownerId
+    this.width    = width
+    this.range    = range
   }
 
   update(deltaTime: number): boolean {
     this.sprite.x += this.vx * deltaTime
     this.sprite.y += this.vy * deltaTime
     this.lifetime += deltaTime
-
-    return this.lifetime > 1000 || this.isOutOfBounds()
+    return this.isCollided() || this.lifetime > (PROJECTILE_LIFE_FRAMES * this.range) || this.isOutOfBounds() || this.isSafeZone()
   }
 
   isOutOfBounds(): boolean {
     return this.sprite.x < 0 || this.sprite.x > WORLD_WIDTH ||
            this.sprite.y < 0 || this.sprite.y > WORLD_HEIGHT
   }
+
+  isSafeZone(): boolean {
+    return this.sprite.x >= 3590 && this.sprite.x <= 4410 && this.sprite.y >= 3590 && this.sprite.y <= 4410
+  } 
+
+  isCollided(): boolean {
+    for (const [usr , [userX, userY]] of FastProjectileCheck.getCell(this.sprite.x, this.sprite.y)) {
+     if (usr != this.ownerId) {
+        const dx = userX - this.sprite.x
+        const dy = userY - this.sprite.y
+        if (dx * dx + dy * dy < 50)  {
+          return true
+        }
+     } 
+    }
+    return false 
+  }
+
 }
 
 export class ProjectilePool {
@@ -47,7 +71,7 @@ export class ProjectilePool {
     this.container = container
   }
 
-  spawn(x: number, y: number, angle: number, speed: number, ownerId: string, damage: number, width: number, range: number) {
+  spawn(x: number, y: number, angle: number, ownerId: string, damage: number, width: number, range: number) {
     let projectile: Projectile
     
     if (this.inactive.length > 0) {
@@ -55,13 +79,13 @@ export class ProjectilePool {
       projectile.sprite.position.set(x, y)
       projectile.sprite.angle = angle
       const radians = (angle - 90) * (Math.PI / 180)
-      projectile.vx = Math.cos(radians) * speed
-      projectile.vy = Math.sin(radians) * speed
+      projectile.vx = Math.cos(radians) * PROJECTILE_SPEED
+      projectile.vy = Math.sin(radians) * PROJECTILE_SPEED
       projectile.lifetime = 0
       projectile.ownerId = ownerId
       projectile.sprite.visible = true
     } else {
-      projectile = new Projectile(x, y, angle, speed, ownerId, damage)
+      projectile = new Projectile(x, y, angle, PROJECTILE_SPEED, ownerId, damage, width, range)
       this.container.addChild(projectile.sprite)
     }
     this.active.push(projectile)
@@ -77,41 +101,6 @@ export class ProjectilePool {
         projectile.sprite.visible = false
         this.inactive.push(projectile)
       }
-    }
-  }
-
-  checkCollisions(targets: Container[]): { projectile: Projectile, target: Container }[] {
-    const hits: { projectile: Projectile, target: Container }[] = []
-    
-    for (const projectile of this.active) {
-      for (const target of targets) {
-        if (this.circleCollision(projectile.sprite, target)) {
-          hits.push({ projectile, target })
-        }
-      }
-    }
-    
-    return hits
-  }
-
-  circleCollision(a: Container, b: Container): boolean {
-    const dx = a.x - b.x
-    const dy = a.y - b.y
-    const distance = Math.sqrt(dx * dx + dy * dy)
-
-    const aRadius = Math.max(a.width, a.height) / 2
-    const bRadius = Math.max(b.width, b.height) / 2
-    const radiusSum = aRadius + bRadius
-    
-    return distance < radiusSum
-  }
-
-  destroy(projectile: Projectile) {
-    const index = this.active.indexOf(projectile)
-    if (index > -1) {
-      this.active.splice(index, 1)
-      projectile.sprite.visible = false
-      this.inactive.push(projectile)
     }
   }
 }

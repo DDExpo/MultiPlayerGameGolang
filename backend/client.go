@@ -9,14 +9,6 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-const (
-	MsgTypeUser          byte = 1
-	MsgTypeChat          byte = 2
-	MsgTypeUserState     byte = 3
-	MsgTypeResumeSession byte = 4
-	MsgTypeInput         byte = 5
-)
-
 type Client struct {
 	hub    *Hub
 	conn   *websocket.Conn
@@ -54,6 +46,8 @@ func (c *Client) ReadPump() {
 			c.handleChatMessage(message[1:])
 		case MsgTypeInput:
 			c.handleUserInput(message[1:])
+		case MsgTypeShoot:
+			c.handleUserShoot()
 		case MsgTypeResumeSession:
 			c.handleUserResumeSession()
 		default:
@@ -76,7 +70,7 @@ func (c *Client) WritePump() {
 }
 
 func (c *Client) handleUserRegistration() {
-	msg := SerializeUserStateDelta(c.player, UserStateDeltaPOS|UserStateDeltaSTATS|UserStateDeltaWEAPON)
+	msg := SerializeUserStateDelta(MsgTypeUserState, c.player, UserStateDeltaPOS|UserStateDeltaSTATS|UserStateDeltaWEAPON)
 	c.hub.broadcast <- msg
 }
 
@@ -111,7 +105,13 @@ func (c *Client) handleUserInput(data []byte) {
 		Angle: angle,
 	}
 }
+
+func (c *Client) handleUserShoot() {
+	msg := SerializeUserStateDelta(MsgTypeShoot, c.player, UserStateDeltaPOS|UserStateDeltaSTATS|UserStateDeltaWEAPON)
+	c.hub.broadcast <- msg
+}
+
 func (c *Client) handleUserResumeSession() {
-	msg := SerializeUserStateDelta(c.player, UserStateDeltaPOS|UserStateDeltaSTATS|UserStateDeltaWEAPON)
+	msg := SerializeUserStateDelta(MsgTypeUserState, c.player, UserStateDeltaPOS|UserStateDeltaSTATS|UserStateDeltaWEAPON)
 	c.hub.broadcast <- msg
 }

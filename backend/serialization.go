@@ -5,9 +5,9 @@ import (
 	"encoding/binary"
 )
 
-func SerializeUserStateDelta(p *Player, deltaMask byte) []byte {
+func SerializeUserStateDelta(msgType uint8, p *Player, deltaMask byte) []byte {
 	buf := &bytes.Buffer{}
-	buf.WriteByte(MsgTypeUserState)
+	buf.WriteByte(msgType)
 	buf.WriteByte(deltaMask)
 
 	usernameBytes := []byte(p.Meta.Username)
@@ -18,7 +18,6 @@ func SerializeUserStateDelta(p *Player, deltaMask byte) []byte {
 	if deltaMask&UserStateDeltaPOS != 0 {
 		binary.Write(buf, binary.LittleEndian, p.Movements.X)
 		binary.Write(buf, binary.LittleEndian, p.Movements.Y)
-		binary.Write(buf, binary.LittleEndian, p.Movements.Speed)
 		binary.Write(buf, binary.LittleEndian, p.Movements.Angle)
 	}
 	if deltaMask&UserStateDeltaSTATS != 0 {

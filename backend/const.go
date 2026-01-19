@@ -18,3 +18,12 @@ const (
 	UserStateDeltaSTATS  byte = 1 << 1 // HP, Kills, Damage
 	UserStateDeltaWEAPON byte = 1 << 2 // WeaponType, WeaponWidth, WeaponRange
 )
+
+const (
+	MsgTypeUser          byte = 1
+	MsgTypeChat          byte = 2
+	MsgTypeUserState     byte = 3
+	MsgTypeResumeSession byte = 4
+	MsgTypeInput         byte = 5
+	MsgTypeShoot         byte = 6
+)
