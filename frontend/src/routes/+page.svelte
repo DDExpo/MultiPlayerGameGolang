@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { messages, uiHasFocus, userRegistered } from "$lib/stores/ui.svelte"
+  import { messages, userUiState } from "$lib/stores/ui.svelte"
   import { MAX_MESSAGE_LENGTH, MAX_USERNAME_LENGTH, MESSAGE_COOLDOWN_MS, MsgType } from "$lib/Consts"
-  import { ClientData } from "$lib/stores/game.svelte"
+  import { ClientData, playersState } from "$lib/stores/game.svelte"
   import { getSocket, initSocket, waitForOpen } from "$lib/net/socket"
 	import { randomBrightColor } from "$lib/utils"
 	import { HttpStatus } from "$lib/types/enums"
@@ -31,7 +31,7 @@
   function sendMessage() {
     socket = getSocket()
     if (!socket || socket.readyState !== WebSocket.OPEN) { showError('Connection not ready',   'chat'); return }
-    if (!userRegistered.isRegistered)                    { showError('User is not authorized', 'chat'); return }
+    if (!userUiState.registered)                         { showError('User is not authorized', 'chat'); return }
 
     const now = new Date()
     const trimmed = message.trim()
@@ -72,7 +72,9 @@
       await waitForOpen(socket)
       socket.send(buf)
 
-      userRegistered.isRegistered = true
+      userUiState.registered = true
+      userUiState.alive      = true
+      playersState[ClientData.Username] = [4000, 4000, 0]
       ClientData.Color = randomBrightColor()
     
     } catch (err) { console.error(`Failed: ${err}`)}
@@ -83,12 +85,12 @@
 
 <div class="main">
 
-  {#if !userRegistered.isRegistered}
+  {#if !userUiState.registered}
     <div class="game-enter-screen">
       <div style:color="White">Enter username</div>
       <input type="text"
-             onfocus={() => uiHasFocus.isFocused = true} 
-             onblur={() => uiHasFocus.isFocused = false} 
+             onfocus={() => userUiState.focused = true} 
+             onblur={()  => userUiState.focused = false} 
              bind:value={ClientData.Username}>
       <button style:font-size="1rem" onclick={createUser}>Enter</button>
       {#if place === "login"}
@@ -109,8 +111,8 @@
 
       <div class="input-row">
         <input type="text"
-               onfocus={() => uiHasFocus.isFocused = true}
-               onblur={() => uiHasFocus.isFocused = false}
+               onfocus={() => userUiState.focused = true} 
+               onblur={()  => userUiState.focused = false} 
                bind:value={message}
                onkeydown={(e) => e.key === 'Enter' && sendMessage()}>
         <button class="btn-send-message" onclick={sendMessage}>send</button>

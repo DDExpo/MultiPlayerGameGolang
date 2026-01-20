@@ -46,8 +46,10 @@ func (c *Client) ReadPump() {
 			c.handleChatMessage(message[1:])
 		case MsgTypeInput:
 			c.handleUserInput(message[1:])
-		case MsgTypeShoot:
-			c.handleUserShoot()
+		case MsgTypePressedShoot:
+			c.handleUserPressedShoot(message[1:])
+		case MsgTypeShootStatus:
+			c.handleUserShootStatus()
 		case MsgTypeResumeSession:
 			c.handleUserResumeSession()
 		default:
@@ -87,8 +89,6 @@ func (c *Client) handleChatMessage(data []byte) {
 func (c *Client) handleUserInput(data []byte) {
 
 	offset := 0
-	seq := binary.LittleEndian.Uint16(data[offset:])
-	offset += 2
 	moveX := int8(data[offset])
 	offset++
 	moveY := int8(data[offset])
@@ -98,7 +98,6 @@ func (c *Client) handleUserInput(data []byte) {
 
 	dash := data[offset] != 0
 	c.player.Input = PlayerInput{
-		Seq:   seq,
 		MoveX: moveX,
 		MoveY: moveY,
 		Dash:  dash,
@@ -106,9 +105,16 @@ func (c *Client) handleUserInput(data []byte) {
 	}
 }
 
-func (c *Client) handleUserShoot() {
-	msg := SerializeUserStateDelta(MsgTypeShoot, c.player, UserStateDeltaPOS|UserStateDeltaSTATS|UserStateDeltaWEAPON)
+func (c *Client) handleUserPressedShoot(data []byte) {
+	mu.Lock()
+	Projectiles = append(Projectiles, CreateProjectile(c.player, binary.BigEndian.Uint32(data)))
+	mu.Unlock()
+
+	msg := SerializeUserStateDelta(MsgTypePressedShoot, c.player, UserStateDeltaPOS|UserStateDeltaSTATS|UserStateDeltaWEAPON)
 	c.hub.broadcast <- msg
+}
+
+func (c *Client) handleUserShootStatus() {
 }
 
 func (c *Client) handleUserResumeSession() {

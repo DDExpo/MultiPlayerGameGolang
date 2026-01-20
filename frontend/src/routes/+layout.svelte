@@ -3,11 +3,11 @@
   import favicon from '$lib/assets/favicon.svg'
   import { onMount, onDestroy } from 'svelte'
   import { Game } from '$lib/game/Game'
-	import { closeSocket, initSocket, waitForOpen } from '$lib/net/socket';
-	import { userRegistered } from '$lib/stores/ui.svelte';
+	import { closeSocket, getSocket, initSocket, waitForOpen } from '$lib/net/socket';
 	import { ClientData, playersState } from '$lib/stores/game.svelte';
 	import { MsgType } from '$lib/Consts';
 	import { randomBrightColor } from '$lib/utils';
+	import { userUiState } from '$lib/stores/ui.svelte';
 
   let game: Game
   let container: HTMLDivElement
@@ -30,9 +30,10 @@
         const data = await res.json()
         ClientData.Username = data.username
         ClientData.Color = randomBrightColor()
-        playersState[ClientData.Username] = [4000, 4000, 0, 0]
+        playersState[ClientData.Username] = [4000, 4000, 0]
         console.log("Session resumed")
-        userRegistered.isRegistered = true
+        userUiState.registered = true
+        userUiState.alive      = true
       } else {
         console.log("No valid session - user needs to login")
       }
@@ -50,6 +51,10 @@
     closeSocket()
   })
 
+  async function resumeGame() {
+    userUiState.alive   = true
+    userUiState.focused = false
+  }
 
 </script>
 
@@ -59,6 +64,10 @@
 
 <div bind:this={container} class="game-root"></div>
 <div class="ui-layer"> {@render children()} </div>
+{#if !userUiState.alive && userUiState.registered}
+  <div class="resume"><button onclick={ resumeGame } > RESUME </button></div>
+{/if}
+
 <div class="player-stats">
   <div>
     HP { ClientData.Hp }
@@ -80,6 +89,14 @@
     z-index: 9;
     color: white;
     font-size: x-large;
+  }
+
+  .resume {
+    height: 100%;
+    position: relative;
+    background: transparent;
+    justify-self: center;
+    align-content: center;
   }
 
   .game-root {

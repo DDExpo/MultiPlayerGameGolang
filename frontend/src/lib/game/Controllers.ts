@@ -1,4 +1,3 @@
-import { uiHasFocus } from "$lib/stores/ui.svelte"
 
 const keyMap = {
   KeyW:       "up",
@@ -31,7 +30,6 @@ export class Controller {
   }
 
   keydownHandler(event: KeyboardEvent) {
-    if (uiHasFocus.isFocused) return
     const key = keyMap[event.code as keyof typeof keyMap]
     if (!key) return
     const now = Date.now()

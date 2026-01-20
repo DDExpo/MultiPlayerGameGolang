@@ -29,13 +29,11 @@ export function serializeChatMsg(text: string, color: string): ArrayBuffer {
 }
 
 export function serializeInputMsg(dx: number, dy: number, isDash: boolean, angle: number) {
-  const buffer = new ArrayBuffer(1 + 2 + 1 + 1 + 4 + 1)
+  const buffer = new ArrayBuffer(1 + 1 + 1 + 4 + 1)
   const view = new DataView(buffer)
   let offset = 0
 
   view.setUint8(offset++, MsgType.USER_INPUT)
-  view.setUint16(offset, ++inputSeq.value, true)
-  offset += 2
   view.setInt8(offset++, dx)
   view.setInt8(offset++, dy)
   view.setFloat32(offset, angle, true)

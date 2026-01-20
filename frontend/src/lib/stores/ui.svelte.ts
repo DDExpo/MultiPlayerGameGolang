@@ -1,4 +1,4 @@
 export const messages: [string, [string, string]][] = $state([])
 
-export const uiHasFocus     = $state({isFocused: false})
-export const userRegistered = $state({isRegistered: false})
+export const userUiState = $state({focused: false, registered: false, alive: false})
+

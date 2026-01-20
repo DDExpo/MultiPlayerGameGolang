@@ -1,5 +1,7 @@
 package main
 
+import "time"
+
 type PLayerMovements struct {
 	X         float32
 	Y         float32
@@ -18,13 +20,13 @@ type PlayerCombat struct {
 	Kills           uint8
 	WeaponType      uint8
 	WeaponWidth     uint8
-	WeaponRange     uint8
+	WeaponRange     uint16
 	LastHP          uint8
 	LastDamage      uint8
 	LastKills       uint8
 	LastWeaponType  uint8
 	LastWeaponWidth uint8
-	LastWeaponRange uint8
+	LastWeaponRange uint16
 }
 
 type PlayerMetadata struct {
@@ -33,7 +35,6 @@ type PlayerMetadata struct {
 }
 
 type PlayerInput struct {
-	Seq   uint16
 	MoveX int8
 	MoveY int8
 	Angle float32
@@ -47,4 +48,18 @@ type Player struct {
 	Input     PlayerInput
 
 	IsConnected bool
+}
+
+type Projectile struct {
+	X, Y           float32
+	VX, VY         float32
+	OwnerId        string
+	Damage         uint8
+	Radius         float32
+	Width          uint8
+	Range          uint16
+	ProjectileType uint8
+	ProjectileId   uint32
+	LifeTime       float32
+	SpawnTime      time.Time
 }

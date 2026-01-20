@@ -33,10 +33,38 @@ func (h *Hub) RunGameLoop() {
 
 	for range ticker.C {
 		for _, p := range h.players {
-			applyInput(p, 1.0/30.0)
-			clampToWorld(p)
+
+			mu.Lock()
+			aliveProjectiles := Projectiles[:0]
+			now := time.Now()
+			for _, prj := range Projectiles {
+				alive, hit := simulateProjectile(prj, now)
+				if !alive {
+					if len(hit) > 0 {
+						log.Println(hit)
+						htarget, ok1 := h.players[hit]
+						attacker, ok2 := h.players[prj.OwnerId]
+						if ok1 && ok2 {
+							ApplyDamage(htarget, attacker)
+						}
+					}
+					msg := SerializeUserShootStatus(alive, prj.ProjectileId)
+					h.broadcast <- msg
+					continue
+				}
+				aliveProjectiles = append(aliveProjectiles, prj)
+			}
+			Projectiles = aliveProjectiles
+			mu.Unlock()
+
+			applyInput(p)
 			deltaMask := computeDeltaMask(p)
 			if deltaMask != 0 {
+				if p.Combat.HP <= 0 {
+					b := make([]byte, 0, 1)
+					b = append(b, MsgTypeUserDead)
+					h.broadcast <- b
+				}
 				msg := SerializeUserStateDelta(MsgTypeUserState, p, deltaMask)
 				h.broadcast <- msg
 				updateLastSent(p, deltaMask)
@@ -61,6 +89,10 @@ func (h *Hub) Run() {
 				delete(h.players, client.player.Meta.SessionID)
 				delete(h.activeUsernames, client.player.Meta.Username)
 				h.mu.Unlock()
+
+				FastProjectileCheck.mu.Lock()
+				FastProjectileCheck.Remove(client.player.Meta.Username)
+				FastProjectileCheck.mu.Unlock()
 
 				log.Printf("Client unregistered: %s", client.player.Meta.Username)
 			}

@@ -1,5 +1,10 @@
 package main
 
+import (
+	"math"
+	"time"
+)
+
 func NewPlayer(username, sessionID string) *Player {
 	return &Player{
 		Movements: &PLayerMovements{
@@ -34,7 +39,6 @@ func NewPlayer(username, sessionID string) *Player {
 		},
 
 		Input: PlayerInput{
-			Seq:   0,
 			MoveX: 0,
 			MoveY: 0,
 			Angle: 0,
@@ -42,6 +46,52 @@ func NewPlayer(username, sessionID string) *Player {
 		},
 
 		IsConnected: true,
+	}
+}
+
+func ResetStats(p *Player) {
+	p.Movements.X = 4000
+	p.Movements.Y = 4000
+	p.Movements.LastX = 4000
+	p.Movements.LastY = 4000
+	p.Movements.Angle = 0
+	p.Movements.LastAngle = 0
+	p.Movements.Speed = 0
+	p.Movements.LastSpeed = 0
+
+	p.Combat.HP = 0
+	p.Combat.Damage = 10
+	p.Combat.WeaponType = 1
+	p.Combat.WeaponWidth = 1
+	p.Combat.WeaponRange = 5
+
+	p.Input.MoveX = 0
+	p.Input.MoveY = 0
+	p.Input.Angle = 0
+	p.Input.Dash = false
+
+	p.IsConnected = true
+}
+
+func CreateProjectile(p *Player, prjcID uint32) *Projectile {
+	radians := (float64(p.Movements.Angle) - 90.0) * (math.Pi / 180.0)
+	vx := float32(math.Cos(radians) * ProjectileSpeed)
+	vy := float32(math.Sin(radians) * ProjectileSpeed)
+
+	return &Projectile{
+		X:              p.Movements.X,
+		Y:              p.Movements.Y,
+		VX:             vx,
+		VY:             vy,
+		OwnerId:        p.Meta.Username,
+		Damage:         p.Combat.Damage,
+		Radius:         float32(projectileRadius * p.Combat.WeaponWidth),
+		Width:          p.Combat.WeaponWidth,
+		Range:          p.Combat.WeaponRange,
+		ProjectileType: p.Combat.WeaponType,
+		ProjectileId:   prjcID,
+		LifeTime:       ProjectileLifetime * float32(p.Combat.WeaponRange),
+		SpawnTime:      time.Now(),
 	}
 }
 

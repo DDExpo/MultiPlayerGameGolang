@@ -1,106 +1,115 @@
-import { PROJECTILE_LIFE_FRAMES, PROJECTILE_SPEED, WORLD_HEIGHT, WORLD_WIDTH } from "$lib/Consts"
+import { PROJECTILE_LIFE, PROJECTILE_SPEED} from "$lib/Consts"
 import { Container, Graphics } from "pixi.js"
-import { FastProjectileCheck } from "./optimizations"
-import { getSocket } from "$lib/net/socket"
 
 export class Projectile {
-  sprite:   Graphics
-  vx:       number
-  vy:       number
-  lifetime: number
-  ownerId:  string
-  damage:   number
-  width:  number
-  range:  number
+  sprite:    Graphics
+  x:         number
+  y:         number
+  vx:        number
+  vy:        number
+  lifetime:  number
+  ownerId:   string
+  width:     number
+  range:     number
+  id:        number
+  spawnTime: number
 
 
-  constructor(x: number, y: number, angle: number, speed: number, ownerId: string, damage: number, width: number, range: number) {
+  constructor(id: number, x: number, y: number, angle: number, speed: number, ownerId: string, width: number, range: number) {
+    this.id = id
+    this.x = x
+    this.y = y
+    this.spawnTime = performance.now()
     this.sprite = new Graphics()
     this.sprite.circle(0, 0, 3 * width).fill({ color: 0xffffff })
     this.sprite.position.set(x, y)
     this.sprite.angle = angle
-  
+    this.ownerId = ownerId
+
     const radians = (angle - 90) * (Math.PI / 180)
     this.vx = Math.cos(radians) * speed
     this.vy = Math.sin(radians) * speed
-    
-    this.lifetime = 0
-    this.damage   = damage
-    this.ownerId  = ownerId
-    this.width    = width
-    this.range    = range
+
+    this.range = range
+    this.lifetime = PROJECTILE_LIFE * this.range
+    this.width = width
   }
 
-  update(deltaTime: number): boolean {
-    this.sprite.x += this.vx * deltaTime
-    this.sprite.y += this.vy * deltaTime
-    this.lifetime += deltaTime
-    return this.isCollided() || this.lifetime > (PROJECTILE_LIFE_FRAMES * this.range) || this.isOutOfBounds() || this.isSafeZone()
+  update(currentTime: number) {
+    const t = (currentTime - this.spawnTime) / 1000
+    this.sprite.x = this.x + this.vx * t
+    this.sprite.y = this.y + this.vy * t
   }
 
-  isOutOfBounds(): boolean {
-    return this.sprite.x < 0 || this.sprite.x > WORLD_WIDTH ||
-           this.sprite.y < 0 || this.sprite.y > WORLD_HEIGHT
+
+  hasExpired(currentTime: number): boolean {
+    const t = (currentTime - this.spawnTime) / 1000
+    return t >= this.lifetime
   }
-
-  isSafeZone(): boolean {
-    return this.sprite.x >= 3590 && this.sprite.x <= 4410 && this.sprite.y >= 3590 && this.sprite.y <= 4410
-  } 
-
-  isCollided(): boolean {
-    for (const [usr , [userX, userY]] of FastProjectileCheck.getCell(this.sprite.x, this.sprite.y)) {
-     if (usr != this.ownerId) {
-        const dx = userX - this.sprite.x
-        const dy = userY - this.sprite.y
-        if (dx * dx + dy * dy < 50)  {
-          return true
-        }
-     } 
-    }
-    return false 
-  }
-
 }
 
 export class ProjectilePool {
-  active:    Projectile[] = []
-  inactive:  Projectile[] = []
+  active: Map<number, Projectile> = new Map()
+  inactive: Projectile[] = []
   container: Container
+  private nextId = 0
 
   constructor(container: Container) {
     this.container = container
   }
 
-  spawn(x: number, y: number, angle: number, ownerId: string, damage: number, width: number, range: number) {
+  spawn(x: number, y: number, angle: number, ownerId: string, width: number, range: number): number {
+    const id = this.nextId++
     let projectile: Projectile
-    
+
     if (this.inactive.length > 0) {
       projectile = this.inactive.pop()!
+      projectile.x = x
+      projectile.y = y
       projectile.sprite.position.set(x, y)
       projectile.sprite.angle = angle
       const radians = (angle - 90) * (Math.PI / 180)
       projectile.vx = Math.cos(radians) * PROJECTILE_SPEED
       projectile.vy = Math.sin(radians) * PROJECTILE_SPEED
-      projectile.lifetime = 0
+      projectile.spawnTime = performance.now()
+      projectile.lifetime = PROJECTILE_LIFE * range
       projectile.ownerId = ownerId
+      projectile.width = width
+      projectile.range = range
       projectile.sprite.visible = true
-    } else {
-      projectile = new Projectile(x, y, angle, PROJECTILE_SPEED, ownerId, damage, width, range)
+      projectile.id = id
+    }  else {
+      projectile = new Projectile(id, x, y, angle, PROJECTILE_SPEED, ownerId, width, range)
       this.container.addChild(projectile.sprite)
     }
-    this.active.push(projectile)
+
+    this.active.set(id, projectile)
+    return id
   }
 
-  update(deltaTime: number) {
-    for (let i = this.active.length - 1; i >= 0; i--) {
-      const projectile = this.active[i]
-      const shouldRemove = projectile.update(deltaTime)
-      
-      if (shouldRemove) {
-        this.active.splice(i, 1)
-        projectile.sprite.visible = false
-        this.inactive.push(projectile)
-      }
+  update() {
+    const now = performance.now()
+    for (const [id, projectile] of this.active.entries()) {
+        projectile.update(now)
+        if (projectile.hasExpired(now)) {
+            this.destroyProjectile(id)
+        }
     }
+  }
+
+  destroyProjectile(id: number) {
+    const projectile = this.active.get(id)
+    if (!projectile) return
+    projectile.sprite.visible = false
+    this.inactive.push(projectile)
+    this.active.delete(id)
+  }
+}
+
+export let projectilePool: ProjectilePool | null = null
+
+export function initProjectilePool(container: Container) {
+  if (!projectilePool) {
+    projectilePool = new ProjectilePool(container)
   }
 }

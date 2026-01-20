@@ -1,13 +1,13 @@
 import { Application, Assets, Text, Container, BlurFilter, Graphics, Sprite, TextStyle } from "pixi.js"
 import { Controller } from "./Controllers"
 import phase1 from "$lib/assets/players/phase1.png"
-import { uiHasFocus, userRegistered } from "$lib/stores/ui.svelte"
-import { ClientData, otherProjectiles, playersState } from "$lib/stores/game.svelte"
+import { ClientData, projectiles, playersState } from "$lib/stores/game.svelte"
 import { getSocket } from "$lib/net/socket"
 import { MsgType, PADDING_USERNAME, WORLD_HEIGHT, WORLD_WIDTH } from "$lib/Consts"
 import { randomBrightColor } from "$lib/utils"
-import { ProjectilePool } from "./Projectiles"
+import { initProjectilePool, projectilePool, ProjectilePool } from "./Projectiles"
 import { serializeInputMsg } from "$lib/net/serialize"
+import { userUiState } from "$lib/stores/ui.svelte"
 
 
 export class Game {
@@ -16,10 +16,9 @@ export class Game {
   playersContainer:     Container
   starfield:            Container
   projectilesContainer: Container
-  projectilePool:       ProjectilePool
 
-  lastShotTime = 0;
-  shootCooldown = 600;
+  lastShotTime = 0
+  shootCooldown = 600
 
   constructor() {
     this.app                  = new Application()
@@ -27,7 +26,7 @@ export class Game {
     this.playersContainer     = new Container()
     this.projectilesContainer = new Container()
     this.starfield            = new Container()
-    this.projectilePool       = new ProjectilePool(this.projectilesContainer)
+    initProjectilePool(this.projectilesContainer)
   }
   
   async init() {
@@ -81,12 +80,13 @@ export class Game {
       resolution: 2,
     })
     userName.anchor.set(0.5, 1)
+    this.world.addChild(userName)
     let userNameCreated = false
     
     this.app.ticker.add((t) => {
       const socket = getSocket()
       
-      if (userRegistered.isRegistered && !uiHasFocus.isFocused) {
+      if (userUiState.registered && !userUiState.focused) {
         if (!userNameCreated) {
           this.world.addChild(userName)
           userNameCreated = true
@@ -111,28 +111,28 @@ export class Game {
         cx = this.app.screen.width  / 2
         cy = this.app.screen.height / 2
         player.position.set(cx, cy)
-     
+
         const [sx, sy, ang] = playersState[ClientData.Username]
-        
         playerWorldCords.X = sx
         playerWorldCords.Y = sy
         userName.position.set(sx, sy + PADDING_USERNAME)
-        player.angle = ang        
+        player.angle = ang
         this.world.position.set(-playerWorldCords.X + cx, -playerWorldCords.Y + cy)
         
         if (controller.keys.space.pressed && !this.isSafeZone(playerWorldCords.X, playerWorldCords.Y)) {
           const now = performance.now()
           if (now - this.lastShotTime >= this.shootCooldown) {
+            const projectileId = projectilePool!.spawn(
+              playerWorldCords.X, playerWorldCords.Y, player.angle,
+              ClientData.Username, ClientData.WeaponWidth, ClientData.WeaponRange,
+            )
             if (socket && socket.readyState === WebSocket.OPEN) { 
-              const buffer = new ArrayBuffer(1)
+              const buffer = new ArrayBuffer(5)
               const view = new DataView(buffer)
-              view.setUint8(0, MsgType.USER_SHOOT)
+              view.setUint8(0, MsgType.USER_PRESSED_SHOOT)
+              view.setUint32(1, projectileId)
               socket.send(buffer)
             }
-            this.projectilePool.spawn(
-              playerWorldCords.X, playerWorldCords.Y, player.angle,
-              ClientData.Username, ClientData.Damage, ClientData.WeaponWidth, ClientData.WeaponRange,
-            )
             this.lastShotTime = now
           }}
       }
@@ -162,12 +162,11 @@ export class Game {
           sprite.angle = ang
           textUser.position.set(x, y + PADDING_USERNAME)
         }}
-        for (const [usr, [x, y, a, d, ww, wr]] of Object.entries(otherProjectiles)) {
-          this.projectilePool.spawn(x, y, a, usr, d, ww, wr)
-          delete otherProjectiles[usr]
+        for (const [usr, [x, y, a, ww, wr]] of Object.entries(projectiles)) {
+          projectilePool!.spawn(x, y, a, usr, ww, wr)
+          delete projectiles[usr]
         }
-
-    this.projectilePool.update(t.deltaTime)
+      projectilePool!.update()
     })
   }
   

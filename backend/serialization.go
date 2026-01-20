@@ -5,6 +5,21 @@ import (
 	"encoding/binary"
 )
 
+func SerializeUserShootStatus(alive bool, id uint32) []byte {
+
+	b := make([]byte, 0, 1+1+4)
+	b = append(b, MsgTypeShootStatus)
+	if alive {
+		b = append(b, 1)
+	} else {
+		b = append(b, 0)
+	}
+	idBytes := make([]byte, 4)
+	binary.BigEndian.PutUint32(idBytes, id)
+	b = append(b, idBytes...)
+	return b
+}
+
 func SerializeUserStateDelta(msgType uint8, p *Player, deltaMask byte) []byte {
 	buf := &bytes.Buffer{}
 	buf.WriteByte(msgType)
