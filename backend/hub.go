@@ -34,14 +34,13 @@ func (h *Hub) RunGameLoop() {
 	for range ticker.C {
 		for _, p := range h.players {
 
+			now := time.Now()
 			mu.Lock()
 			aliveProjectiles := Projectiles[:0]
-			now := time.Now()
 			for _, prj := range Projectiles {
 				alive, hit := simulateProjectile(prj, now)
 				if !alive {
 					if len(hit) > 0 {
-						log.Println(hit)
 						htarget, ok1 := h.players[hit]
 						attacker, ok2 := h.players[prj.OwnerId]
 						if ok1 && ok2 {
@@ -61,9 +60,9 @@ func (h *Hub) RunGameLoop() {
 			deltaMask := computeDeltaMask(p)
 			if deltaMask != 0 {
 				if p.Combat.HP <= 0 {
-					b := make([]byte, 0, 1)
-					b = append(b, MsgTypeUserDead)
-					h.broadcast <- b
+					h.broadcast <- SerializeUserDead(p.Meta.Username)
+					p.Movements.X = 4000
+					p.Movements.Y = 4000
 				}
 				msg := SerializeUserStateDelta(MsgTypeUserState, p, deltaMask)
 				h.broadcast <- msg

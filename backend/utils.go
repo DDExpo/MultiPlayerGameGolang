@@ -59,8 +59,8 @@ func ResetStats(p *Player) {
 	p.Movements.Speed = 0
 	p.Movements.LastSpeed = 0
 
-	p.Combat.HP = 0
-	p.Combat.Damage = 10
+	p.Combat.HP = 1
+	p.Combat.Damage = 1
 	p.Combat.WeaponType = 1
 	p.Combat.WeaponWidth = 1
 	p.Combat.WeaponRange = 5
@@ -83,7 +83,7 @@ func CreateProjectile(p *Player, prjcID uint32) *Projectile {
 		Y:              p.Movements.Y,
 		VX:             vx,
 		VY:             vy,
-		OwnerId:        p.Meta.Username,
+		OwnerId:        p.Meta.SessionID[:16],
 		Damage:         p.Combat.Damage,
 		Radius:         float32(projectileRadius * p.Combat.WeaponWidth),
 		Width:          p.Combat.WeaponWidth,

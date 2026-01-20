@@ -30,7 +30,7 @@
         const data = await res.json()
         ClientData.Username = data.username
         ClientData.Color = randomBrightColor()
-        playersState[ClientData.Username] = [4000, 4000, 0]
+        playersState[ClientData.Username] = [4000, 4000, 0, true]
         console.log("Session resumed")
         userUiState.registered = true
         userUiState.alive      = true
@@ -52,8 +52,15 @@
   })
 
   async function resumeGame() {
+    const socket = getSocket()
+    const buffer = new ArrayBuffer(1)
+    const view = new DataView(buffer)
+    view.setUint8(0, MsgType.USER_RESUMED_DEATH)
+  
+    socket?.send(buffer)
     userUiState.alive   = true
     userUiState.focused = false
+    playersState[ClientData.Username] = [4000, 4000, 0, false]
   }
 
 </script>
@@ -97,6 +104,8 @@
     background: transparent;
     justify-self: center;
     align-content: center;
+    inset: 0;
+    z-index: 11;
   }
 
   .game-root {

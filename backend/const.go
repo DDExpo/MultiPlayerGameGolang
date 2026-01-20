@@ -29,12 +29,13 @@ const (
 )
 
 const (
-	MsgTypeUser          byte = 1
-	MsgTypeChat          byte = 2
-	MsgTypeUserState     byte = 3
-	MsgTypeResumeSession byte = 4
-	MsgTypeInput         byte = 5
-	MsgTypePressedShoot  byte = 6
-	MsgTypeShootStatus   byte = 7
-	MsgTypeUserDead      byte = 8
+	MsgTypeUser             byte = 1
+	MsgTypeChat             byte = 2
+	MsgTypeUserState        byte = 3
+	MsgTypeResumeSession    byte = 4
+	MsgTypeInput            byte = 5
+	MsgTypePressedShoot     byte = 6
+	MsgTypeShootStatus      byte = 7
+	MsgTypeUserDead         byte = 8
+	MsgTypeUserResumedDeath byte = 9
 )

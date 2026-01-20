@@ -5,6 +5,15 @@ import (
 	"encoding/binary"
 )
 
+func SerializeUserDead(username string) []byte {
+	nameBytes := []byte(username)
+	b := make([]byte, 0, 1+1+len(nameBytes))
+	b = append(b, MsgTypeUserDead)
+	b = append(b, byte(len(nameBytes)))
+	b = append(b, nameBytes...)
+	return b
+}
+
 func SerializeUserShootStatus(alive bool, id uint32) []byte {
 
 	b := make([]byte, 0, 1+1+4)

@@ -74,7 +74,7 @@
 
       userUiState.registered = true
       userUiState.alive      = true
-      playersState[ClientData.Username] = [4000, 4000, 0]
+      playersState[ClientData.Username] = [4000, 4000, 0, false]
       ClientData.Color = randomBrightColor()
     
     } catch (err) { console.error(`Failed: ${err}`)}

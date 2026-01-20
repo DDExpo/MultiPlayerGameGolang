@@ -25,10 +25,6 @@ function createSocket(url: string) {
       const msgType = view.getUint8(off.v++)
 
       switch (msgType) {
-        case MsgType.USER_DEAD: {
-          userUiState.alive   = false
-          userUiState.focused = true
-        }
         case MsgType.USER_STATE: {
         const deltaMask = view.getUint8(off.v++)
         const username  = readString(view, buffer, off)
@@ -38,12 +34,18 @@ function createSocket(url: string) {
           x     = readFloat32(view, off)
           y     = readFloat32(view, off)
           angle = readFloat32(view, off)
-          playersState[username] = [x, y, angle]
+          playersState[username] = [x, y, angle, !userUiState.alive]
         }
 
         if (username === ClientData.Username) {
           if (deltaMask & UserStateDelta.STATS) {
             ClientData.Hp     = view.getUint8(off.v++)
+            if (ClientData.Hp <= 0) {
+              userUiState.alive   = false
+              userUiState.focused = true
+              playersState[username] = [4000, 4000, 0, true]
+              console.log(playersState[username])
+            }
             ClientData.Kills  = view.getUint8(off.v++)
             ClientData.Damage = view.getUint8(off.v++)
           }

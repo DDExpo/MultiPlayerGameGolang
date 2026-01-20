@@ -52,6 +52,8 @@ func (c *Client) ReadPump() {
 			c.handleUserShootStatus()
 		case MsgTypeResumeSession:
 			c.handleUserResumeSession()
+		case MsgTypeUserResumedDeath:
+			c.handleUserResumedDeath()
 		default:
 			log.Printf("unknown message type: %d", message[0])
 		}
@@ -115,6 +117,14 @@ func (c *Client) handleUserPressedShoot(data []byte) {
 }
 
 func (c *Client) handleUserShootStatus() {
+}
+
+func (c *Client) handleUserResumedDeath() {
+	log.Println(c.player.Combat.HP)
+	ResetStats(c.player)
+	log.Println(c.player.Combat.HP)
+	msg := SerializeUserStateDelta(MsgTypeUserState, c.player, UserStateDeltaPOS|UserStateDeltaSTATS|UserStateDeltaWEAPON)
+	c.hub.broadcast <- msg
 }
 
 func (c *Client) handleUserResumeSession() {

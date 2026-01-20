@@ -81,16 +81,12 @@ export class Game {
     })
     userName.anchor.set(0.5, 1)
     this.world.addChild(userName)
-    let userNameCreated = false
-    
+
     this.app.ticker.add((t) => {
       const socket = getSocket()
       
       if (userUiState.registered && !userUiState.focused) {
-        if (!userNameCreated) {
-          this.world.addChild(userName)
-          userNameCreated = true
-        }
+
         let dx = 0, dy = 0
         
         if (controller.keys.left.pressed)  dx -= 1
@@ -112,7 +108,7 @@ export class Game {
         cy = this.app.screen.height / 2
         player.position.set(cx, cy)
 
-        const [sx, sy, ang] = playersState[ClientData.Username]
+        const [sx, sy, ang, _] = playersState[ClientData.Username]
         playerWorldCords.X = sx
         playerWorldCords.Y = sy
         userName.position.set(sx, sy + PADDING_USERNAME)
@@ -137,7 +133,7 @@ export class Game {
           }}
       }
       
-      for (const [usr, [x, y, ang]] of Object.entries(playersState)) {
+      for (const [usr, [x, y, ang, dead]] of Object.entries(playersState)) {
         if (usr !== ClientData.Username) {
           
           const entry = otherPlayerSprites.get(usr)
@@ -158,15 +154,31 @@ export class Game {
           }
           
           const [sprite, textUser] = otherPlayerSprites.get(usr)!
-          sprite.position.set(x, y)
-          sprite.angle = ang
-          textUser.position.set(x, y + PADDING_USERNAME)
+          console.log(usr, dead)
+          if (!dead) {
+            sprite.position.set(x, y)
+            sprite.angle = ang
+            textUser.position.set(x, y + PADDING_USERNAME)
+            sprite.visible   = true
+            textUser.visible = true
+          } else {
+            sprite.visible   = false
+            textUser.visible = false
+          }
+            
         }}
         for (const [usr, [x, y, a, ww, wr]] of Object.entries(projectiles)) {
           projectilePool!.spawn(x, y, a, usr, ww, wr)
           delete projectiles[usr]
         }
       projectilePool!.update()
+      if (ClientData.Hp <= 0) {
+        player.visible   = false
+        userName.visible = false
+      } else {
+        player.visible   = true
+        userName.visible = true
+      }
     })
   }
   

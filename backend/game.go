@@ -27,7 +27,7 @@ func applyInput(p *Player) {
 		p.Movements.Y = 4000
 	}
 
-	FastProjectileCheck.Update(p.Meta.Username, p.Movements.X, p.Movements.Y)
+	FastProjectileCheck.Update(p.Meta.SessionID[:16], p.Movements.X, p.Movements.Y)
 	p.Movements.Angle = p.Input.Angle
 }
 func simulateProjectile(p *Projectile, now time.Time) (bool, string) {
@@ -55,7 +55,7 @@ func simulateProjectile(p *Projectile, now time.Time) (bool, string) {
 	return true, ""
 }
 
-func CheckCollision(px, py float32, radius float32, owner string) (string, bool) {
+func CheckCollision(px, py float32, ProjectileRadius float32, owner string) (string, bool) {
 
 	cell := FastProjectileCheck.GetCell(px, py)
 	if cell == nil {
@@ -67,24 +67,10 @@ func CheckCollision(px, py float32, radius float32, owner string) (string, bool)
 			continue
 		}
 
-		closestX := px
-		if px < target.X {
-			closestX = target.X
-		} else if px > target.X+PlayerWidth {
-			closestX = target.X + PlayerWidth
-		}
-
-		closestY := py
-		if py < target.Y {
-			closestY = target.Y
-		} else if py > target.Y+PlayerHeight {
-			closestY = target.Y + PlayerHeight
-		}
-
-		dx := px - closestX
-		dy := py - closestY
-
-		if dx*dx+dy*dy < radius*radius {
+		if px >= target.X-ProjectileRadius &&
+			px <= target.X+PlayerWidth+ProjectileRadius &&
+			py >= target.Y-ProjectileRadius &&
+			py <= target.Y+PlayerHeight+ProjectileRadius {
 			return id, true
 		}
 	}
@@ -95,8 +81,8 @@ func CheckCollision(px, py float32, radius float32, owner string) (string, bool)
 func ApplyDamage(target *Player, attacker *Player) (string, bool) {
 	target.Combat.HP -= attacker.Combat.Damage
 	if target.Combat.HP <= 0 {
-		ResetStats(target)
+		attacker.Combat.Kills += 1
+		attacker.Combat.HP += 1
 	}
-	attacker.Combat.Kills += 1
 	return "", false
 }

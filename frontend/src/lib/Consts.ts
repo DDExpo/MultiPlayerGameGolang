@@ -20,5 +20,6 @@ export const MsgType = {
   USER_INPUT:          5,
   USER_PRESSED_SHOOT:  6,
   USER_SHOOT_STATUS:   7,
-  USER_DEAD:           8
+  USER_DEAD:           8,
+  USER_RESUMED_DEATH:  9
 }
