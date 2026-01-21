@@ -2,7 +2,7 @@
 export enum UserStateDelta {
   POS    = 1 << 0, // X, Y, speed, angle
   STATS  = 1 << 1,
-  WEAPON = 1 << 2
+  WEAPON = 1 << 2,
 }
 
 export enum HttpStatus {

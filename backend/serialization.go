@@ -1,100 +1,131 @@
 package main
 
 import (
-	"bytes"
 	"encoding/binary"
+	"math"
 )
 
+type BinaryWriter struct {
+	buf []byte
+}
+
+func NewBinaryWriter() *BinaryWriter {
+	return &BinaryWriter{buf: make([]byte, 0, 256)}
+}
+
+func (w *BinaryWriter) Bytes() []byte {
+	return w.buf
+}
+
+func (w *BinaryWriter) WriteUint8(v uint8) {
+	w.buf = append(w.buf, v)
+}
+
+func (w *BinaryWriter) WriteInt16(v int16) {
+	w.buf = binary.LittleEndian.AppendUint16(w.buf, uint16(v))
+}
+
+func (w *BinaryWriter) WriteUint16(v uint16) {
+	w.buf = binary.LittleEndian.AppendUint16(w.buf, v)
+}
+
+func (w *BinaryWriter) WriteUint32(v uint32) {
+	w.buf = binary.LittleEndian.AppendUint32(w.buf, v)
+}
+
+func (w *BinaryWriter) WriteFloat32(v float32) {
+	w.buf = binary.LittleEndian.AppendUint32(w.buf, math.Float32bits(v))
+}
+
+func (w *BinaryWriter) WriteString(s string) {
+	w.WriteUint16(uint16(len(s)))
+	w.buf = append(w.buf, []byte(s)...)
+}
+
+func SerializeUserReg(p *Player) []byte {
+	w := NewBinaryWriter()
+	w.WriteUint8(MsgTypeUserState)
+	w.WriteUint8(StateTypeUserReg)
+	w.WriteString(p.Meta.Username)
+	w.WriteFloat32(p.Movements.X)
+	w.WriteFloat32(p.Movements.Y)
+	w.WriteFloat32(p.Movements.Angle)
+	w.WriteInt16(p.Combat.HP)
+	w.WriteUint16(p.Combat.Kills)
+	w.WriteInt16(p.Combat.Damage)
+	w.WriteUint8(p.Combat.WeaponType)
+	w.WriteUint8(p.Combat.WeaponWidth)
+	w.WriteUint16(p.Combat.WeaponRange)
+	return w.Bytes()
+}
+
 func SerializeUserDead(username string) []byte {
-	nameBytes := []byte(username)
-	b := make([]byte, 0, 1+1+len(nameBytes))
-	b = append(b, MsgTypeUserDead)
-	b = append(b, byte(len(nameBytes)))
-	b = append(b, nameBytes...)
-	return b
+	w := NewBinaryWriter()
+	w.WriteUint8(MsgTypeUserState)
+	w.WriteUint8(StateTypeUserDead)
+	w.WriteString(username)
+	return w.Bytes()
 }
 
-func SerializeUserShootStatus(alive bool, id uint32) []byte {
-
-	b := make([]byte, 0, 1+1+4)
-	b = append(b, MsgTypeShootStatus)
-	if alive {
-		b = append(b, 1)
-	} else {
-		b = append(b, 0)
-	}
-	idBytes := make([]byte, 4)
-	binary.BigEndian.PutUint32(idBytes, id)
-	b = append(b, idBytes...)
-	return b
-}
-
-func SerializeUserStateDelta(msgType uint8, p *Player, deltaMask byte) []byte {
-	buf := &bytes.Buffer{}
-	buf.WriteByte(msgType)
-	buf.WriteByte(deltaMask)
-
-	usernameBytes := []byte(p.Meta.Username)
-	usernameBytes = bytes.TrimRight(usernameBytes, "\x00")
-	buf.WriteByte(byte(len(usernameBytes)))
-	buf.Write(usernameBytes)
+func SerializeUserCurrentState(deltaMask uint8, p *Player) []byte {
+	w := NewBinaryWriter()
+	w.WriteUint8(MsgTypeUserState)
+	w.WriteUint8(StateTypeUserCurrentState)
+	w.WriteString(p.Meta.Username)
+	w.WriteUint8(deltaMask)
 
 	if deltaMask&UserStateDeltaPOS != 0 {
-		binary.Write(buf, binary.LittleEndian, p.Movements.X)
-		binary.Write(buf, binary.LittleEndian, p.Movements.Y)
-		binary.Write(buf, binary.LittleEndian, p.Movements.Angle)
-	}
-	if deltaMask&UserStateDeltaSTATS != 0 {
-		binary.Write(buf, binary.LittleEndian, p.Combat.HP)
-		binary.Write(buf, binary.LittleEndian, p.Combat.Kills)
-		binary.Write(buf, binary.LittleEndian, p.Combat.Damage)
-	}
-	if deltaMask&UserStateDeltaWEAPON != 0 {
-		binary.Write(buf, binary.LittleEndian, p.Combat.WeaponType)
-		binary.Write(buf, binary.LittleEndian, p.Combat.WeaponWidth)
-		binary.Write(buf, binary.LittleEndian, p.Combat.WeaponRange)
+		w.WriteFloat32(p.Movements.X)
+		w.WriteFloat32(p.Movements.Y)
+		w.WriteFloat32(p.Movements.Angle)
 	}
 
-	return buf.Bytes()
+	if deltaMask&UserStateDeltaSTATS != 0 {
+		w.WriteInt16(p.Combat.HP)
+		w.WriteUint16(p.Combat.Kills)
+		w.WriteInt16(p.Combat.Damage)
+	}
+
+	if deltaMask&UserStateDeltaWEAPON != 0 {
+		w.WriteUint8(p.Combat.WeaponType)
+		w.WriteUint8(p.Combat.WeaponWidth)
+		w.WriteUint16(p.Combat.WeaponRange)
+	}
+
+	return w.Bytes()
 }
 
-func SerializeUserMsg(username string, text string, timestamp string, color string) []byte {
-	userBytes := []byte(username)
-	textBytes := []byte(text)
-	tsBytes := []byte(timestamp)
-	colorBytes := []byte(color)
+func SerializeUserPressedShoot(p *Player) []byte {
+	w := NewBinaryWriter()
+	w.WriteUint8(MsgTypeUserState)
+	w.WriteUint8(StateTypeUserPressedShoot)
+	w.WriteString(p.Meta.Username)
+	w.WriteFloat32(p.Movements.X)
+	w.WriteFloat32(p.Movements.Y)
+	w.WriteFloat32(p.Movements.Angle)
+	w.WriteUint8(p.Combat.WeaponWidth)
+	w.WriteUint16(p.Combat.WeaponRange)
+	return w.Bytes()
+}
 
-	size := 1 +
-		1 + len(userBytes) +
-		1 + len(textBytes) +
-		1 + len(tsBytes) +
-		1 + len(colorBytes)
+func SerializeUserShootStatus(alive bool, id uint16) []byte {
+	w := NewBinaryWriter()
+	w.WriteUint8(MsgTypeUserShootStatus)
+	if alive {
+		w.WriteUint8(1)
+	} else {
+		w.WriteUint8(0)
+	}
+	w.WriteUint16(id)
+	return w.Bytes()
+}
 
-	buf := make([]byte, size)
-	offset := 0
-
-	buf[offset] = byte(MsgTypeChat)
-	offset++
-
-	buf[offset] = byte(len(userBytes))
-	offset++
-	copy(buf[offset:], userBytes)
-	offset += len(userBytes)
-
-	buf[offset] = byte(len(textBytes))
-	offset++
-	copy(buf[offset:], textBytes)
-	offset += len(textBytes)
-
-	buf[offset] = byte(len(tsBytes))
-	offset++
-	copy(buf[offset:], tsBytes)
-	offset += len(tsBytes)
-
-	buf[offset] = byte(len(colorBytes))
-	offset++
-	copy(buf[offset:], colorBytes)
-	offset += len(colorBytes)
-
-	return buf
+func SerializeUserChat(username, text, timestamp, color string) []byte {
+	w := NewBinaryWriter()
+	w.WriteUint8(MsgTypeUserChat)
+	w.WriteString(username)
+	w.WriteString(text)
+	w.WriteString(timestamp)
+	w.WriteString(color)
+	return w.Bytes()
 }

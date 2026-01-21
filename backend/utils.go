@@ -56,14 +56,15 @@ func ResetStats(p *Player) {
 	p.Movements.LastY = 4000
 	p.Movements.Angle = 0
 	p.Movements.LastAngle = 0
-	p.Movements.Speed = 0
-	p.Movements.LastSpeed = 0
+	p.Movements.Speed = 1
+	p.Movements.LastSpeed = 1
 
 	p.Combat.HP = 1
+	p.Combat.Kills = 0
 	p.Combat.Damage = 1
 	p.Combat.WeaponType = 1
 	p.Combat.WeaponWidth = 1
-	p.Combat.WeaponRange = 5
+	p.Combat.WeaponRange = 1
 
 	p.Input.MoveX = 0
 	p.Input.MoveY = 0
@@ -73,7 +74,7 @@ func ResetStats(p *Player) {
 	p.IsConnected = true
 }
 
-func CreateProjectile(p *Player, prjcID uint32) *Projectile {
+func CreateProjectile(p *Player, prjcID uint16) *Projectile {
 	radians := (float64(p.Movements.Angle) - 90.0) * (math.Pi / 180.0)
 	vx := float32(math.Cos(radians) * ProjectileSpeed)
 	vy := float32(math.Sin(radians) * ProjectileSpeed)
@@ -130,4 +131,14 @@ func updateLastSent(p *Player, mask byte) {
 		p.Combat.LastWeaponWidth = p.Combat.WeaponWidth
 		p.Combat.LastWeaponRange = p.Combat.WeaponRange
 	}
+}
+
+func clamp(value, min, max float32) float32 {
+	if value < min {
+		return min
+	}
+	if value > max {
+		return max
+	}
+	return value
 }

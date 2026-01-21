@@ -1,11 +1,11 @@
 import { Application, Assets, Text, Container, BlurFilter, Graphics, Sprite, TextStyle } from "pixi.js"
 import { Controller } from "./Controllers"
 import phase1 from "$lib/assets/players/phase1.png"
-import { ClientData, projectiles, playersState } from "$lib/stores/game.svelte"
+import { ClientData, playersState, projectileQueue } from "$lib/stores/game.svelte"
 import { getSocket } from "$lib/net/socket"
-import { MsgType, PADDING_USERNAME, WORLD_HEIGHT, WORLD_WIDTH } from "$lib/Consts"
+import { PADDING_USERNAME, StateType, WORLD_HEIGHT, WORLD_WIDTH } from "$lib/Consts"
 import { randomBrightColor } from "$lib/utils"
-import { initProjectilePool, projectilePool, ProjectilePool } from "./Projectiles"
+import { initProjectilePool, projectilePool } from "./Projectiles"
 import { serializeInputMsg } from "$lib/net/serialize"
 import { userUiState } from "$lib/stores/ui.svelte"
 
@@ -16,8 +16,12 @@ export class Game {
   playersContainer:     Container
   starfield:            Container
   projectilesContainer: Container
+  userName:             Text
 
-  lastShotTime = 0
+  screenCenterX:        number
+  screenCenterY:        number
+
+  lastShotTime  = 0
   shootCooldown = 600
 
   constructor() {
@@ -26,6 +30,11 @@ export class Game {
     this.playersContainer     = new Container()
     this.projectilesContainer = new Container()
     this.starfield            = new Container()
+    this.userName             = new Text
+    
+    this.screenCenterX        = 0
+    this.screenCenterY        = 0
+
     initProjectilePool(this.projectilesContainer)
   }
   
@@ -36,10 +45,16 @@ export class Game {
       antialias: false,
       resolution: window.devicePixelRatio || 1,
     })
+    this.screenCenterX = this.app.screen.width  / 2
+    this.screenCenterY = this.app.screen.height / 2
+
+    this.playersContainer.enableRenderGroup()
+    this.projectilesContainer.enableRenderGroup()
+    
     const bounds = new Graphics()
     bounds.rect(0, 0, WORLD_WIDTH, WORLD_HEIGHT).stroke({ width: 12, color: 0xff0000 })
     this.world.addChild(bounds)
-  
+    
     const safeZone = new Graphics()
     safeZone.rect(3600, 3600, 800, 800).stroke({ width: 6, color: 0x1fff01 })
     this.world.addChild(safeZone)
@@ -51,12 +66,12 @@ export class Game {
     })
     safeZoneText.position.set(3780, 4420)
     this.world.addChild(safeZoneText)
-
+    
     this.createStarfield()
     this.world.addChild(this.starfield)
     this.world.addChild(this.projectilesContainer)
     this.world.addChild(this.playersContainer)
-
+    
     const controller = new Controller()
     const otherPlayerSprites = new Map<string, [Sprite, Text]>()
     
@@ -65,77 +80,25 @@ export class Game {
     const playerWorldCords = { X: 0, Y: 0 }
     player.anchor.set(0.5)
     player.scale.set(0.3)
-    let cx = this.app.screen.width  / 2
-    let cy = this.app.screen.height / 2 
-    player.x = cx
-    player.y = cy
-
-    this.app.stage.addChild(player)
+    player.x = this.screenCenterX
+    player.y = this.screenCenterY
     
+    this.app.stage.addChild(player)
     this.app.stage.addChild(this.world)
     
-    const userName = new Text({
-      text: ClientData.Username,
-      style: new TextStyle({ fontSize: 10, fontFamily: "PixelUI", fill: ClientData.Color}),
-      resolution: 2,
-    })
-    userName.anchor.set(0.5, 1)
-    this.world.addChild(userName)
-
+    this.userName.anchor.set(0.5, 1)
+    this.world.addChild(this.userName)
+    
     this.app.ticker.add((t) => {
       const socket = getSocket()
+      const socketReady = socket?.readyState === WebSocket.OPEN
       
-      if (userUiState.registered && !userUiState.focused) {
-
-        let dx = 0, dy = 0
+      for (const [usr, state] of Object.entries(playersState)) {
+        const { movement, combat } = state
+        const [x, y, ang]          = movement
+        const visible              = !combat.dead
         
-        if (controller.keys.left.pressed)  dx -= 1
-        if (controller.keys.right.pressed) dx += 1
-        if (controller.keys.up.pressed)    dy -= 1
-        if (controller.keys.down.pressed)  dy += 1
-        
-        if (dx != 0 || dy != 0) {
-          player.angle = Math.atan2(dy, dx) * (180 / Math.PI) + 90
-          playerWorldCords.X = dx
-          playerWorldCords.Y = dy
-        }
-        
-        if (socket && socket.readyState === WebSocket.OPEN) { 
-          const movements = serializeInputMsg(dx, dy, controller.checkDoubleTap.pressed, player.angle)
-          socket.send(movements)
-        }
-        cx = this.app.screen.width  / 2
-        cy = this.app.screen.height / 2
-        player.position.set(cx, cy)
-
-        const [sx, sy, ang, _] = playersState[ClientData.Username]
-        playerWorldCords.X = sx
-        playerWorldCords.Y = sy
-        userName.position.set(sx, sy + PADDING_USERNAME)
-        player.angle = ang
-        this.world.position.set(-playerWorldCords.X + cx, -playerWorldCords.Y + cy)
-        
-        if (controller.keys.space.pressed && !this.isSafeZone(playerWorldCords.X, playerWorldCords.Y)) {
-          const now = performance.now()
-          if (now - this.lastShotTime >= this.shootCooldown) {
-            const projectileId = projectilePool!.spawn(
-              playerWorldCords.X, playerWorldCords.Y, player.angle,
-              ClientData.Username, ClientData.WeaponWidth, ClientData.WeaponRange,
-            )
-            if (socket && socket.readyState === WebSocket.OPEN) { 
-              const buffer = new ArrayBuffer(5)
-              const view = new DataView(buffer)
-              view.setUint8(0, MsgType.USER_PRESSED_SHOOT)
-              view.setUint32(1, projectileId)
-              socket.send(buffer)
-            }
-            this.lastShotTime = now
-          }}
-      }
-      
-      for (const [usr, [x, y, ang, dead]] of Object.entries(playersState)) {
         if (usr !== ClientData.Username) {
-          
           const entry = otherPlayerSprites.get(usr)
           if (!entry) {
             const sprite = new Sprite(texture)
@@ -154,31 +117,91 @@ export class Game {
           }
           
           const [sprite, textUser] = otherPlayerSprites.get(usr)!
-          console.log(usr, dead)
-          if (!dead) {
-            sprite.position.set(x, y)
-            sprite.angle = ang
-            textUser.position.set(x, y + PADDING_USERNAME)
-            sprite.visible   = true
-            textUser.visible = true
-          } else {
-            sprite.visible   = false
-            textUser.visible = false
+          
+          if (sprite.visible !== visible) {
+            sprite.visible = visible
+            textUser.visible = visible
           }
-            
-        }}
-        for (const [usr, [x, y, a, ww, wr]] of Object.entries(projectiles)) {
-          projectilePool!.spawn(x, y, a, usr, ww, wr)
-          delete projectiles[usr]
+
+          if (!visible) continue
+          
+          sprite.position.set(x, y)
+          sprite.angle = ang
+          textUser.position.set(x, y + PADDING_USERNAME)
         }
-      projectilePool!.update()
-      if (ClientData.Hp <= 0) {
-        player.visible   = false
-        userName.visible = false
-      } else {
-        player.visible   = true
-        userName.visible = true
       }
+      for (const [usr, x, y, angle, ww, wr] of projectileQueue) {
+        projectilePool!.spawn(x, y, angle, usr, ww, wr)
+      }
+      projectileQueue.length = 0
+      projectilePool!.update()
+      
+      
+      if (!userUiState.registered || userUiState.focused) return
+      
+      
+      let lastDx = 0, lastDy = 0
+      
+      const dx = (controller.keys.right.pressed ? 1 : 0) - (controller.keys.left.pressed ? 1 : 0)
+      const dy = (controller.keys.down.pressed  ? 1 : 0) - (controller.keys.up.pressed   ? 1 : 0)
+      
+      if (dx !== lastDx || dy !== lastDy) {
+        player.angle = Math.atan2(dy, dx) * (180 / Math.PI) + 90
+        playerWorldCords.X = dx
+        playerWorldCords.Y = dy
+        lastDx = dx
+        lastDy = dy
+      }
+      if (socketReady) { 
+        const movements = serializeInputMsg(dx, dy, controller.checkDoubleTap.pressed, player.angle)
+        socket.send(movements)
+      }
+      player.position.set(this.screenCenterX, this.screenCenterY)
+      
+      const { movement, combat } = playersState[ClientData.Username]
+      const [sx, sy, ang] = movement
+      const visible = !combat.dead
+      
+      if (player.visible !== visible) {
+        player.visible = visible
+        this.userName.visible = visible
+      }
+
+      if (!visible) return
+
+      playerWorldCords.X = sx
+      playerWorldCords.Y = sy
+      player.angle = ang
+      this.userName.position.set(sx, sy + PADDING_USERNAME)
+        
+      const newWorldX = -playerWorldCords.X + this.screenCenterX
+      const newWorldY = -playerWorldCords.Y + this.screenCenterY
+
+      if (this.world.x !== newWorldX || this.world.y !== newWorldY) {
+        this.world.position.set(newWorldX, newWorldY)
+      }
+      
+      if (controller.keys.space.pressed && !this.isSafeZone(playerWorldCords.X, playerWorldCords.Y)) {
+        const now = performance.now()
+        if (now - this.lastShotTime >= this.shootCooldown) {
+          const projectileId = projectilePool!.spawn(
+            playerWorldCords.X, playerWorldCords.Y, player.angle,
+            ClientData.Username, ClientData.WeaponWidth, ClientData.WeaponRange,
+          )
+          if (socketReady) { 
+            const buffer = new ArrayBuffer(5)
+            const view = new DataView(buffer)
+            view.setUint8(0, StateType.USER_PRESSED_SHOOT)
+            view.setUint32(1, projectileId)
+            socket.send(buffer)
+          }
+          this.lastShotTime = now
+      }}
+    })
+
+    this.app.renderer.on('resize', () => {
+      this.screenCenterX = this.app.screen.width  / 2
+      this.screenCenterY = this.app.screen.height / 2
     })
   }
   
@@ -204,19 +227,22 @@ export class Game {
     this.starfield.enableRenderGroup()
   }
   
-  mount(el: HTMLElement) {
+  public mount(el: HTMLElement) {
     el.appendChild(this.app.canvas)
-    this.world.position.set(
-      this.app.screen.width  / 2,
-      this.app.screen.height / 2
-    )
+    this.world.position.set(this.screenCenterX, this.screenCenterY)
   }
-
-  isSafeZone(x: number, y: number): boolean {
-    return x >= 3590 && x <= 4410 && y >= 3590 && y <= 4410
-  } 
-
-  destroy() {
+  
+  public setUsernameTextStyle() {
+    this.userName.text = ClientData.Username
+    this.userName.style = new TextStyle({ fontSize: 10, fontFamily: "PixelUI", fill: ClientData.Color})
+    this.userName.resolution = 2
+  }
+  
+  public destroy() {
     this.app.destroy(true)
   }
+
+  private isSafeZone(x: number, y: number): boolean {
+    return x >= 3590 && x <= 4410 && y >= 3590 && y <= 4410
+  } 
 }

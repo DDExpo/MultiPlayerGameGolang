@@ -7,6 +7,7 @@ import (
 
 var mu sync.Mutex
 var Projectiles []*Projectile = []*Projectile{}
+
 var FastProjectileCheck = NewSpatialHash(400)
 
 func applyInput(p *Player) {
@@ -54,8 +55,7 @@ func simulateProjectile(p *Projectile, now time.Time) (bool, string) {
 
 	return true, ""
 }
-
-func CheckCollision(px, py float32, ProjectileRadius float32, owner string) (string, bool) {
+func CheckCollision(px, py float32, projectileRadius float32, owner string) (string, bool) {
 
 	cell := FastProjectileCheck.GetCell(px, py)
 	if cell == nil {
@@ -67,10 +67,20 @@ func CheckCollision(px, py float32, ProjectileRadius float32, owner string) (str
 			continue
 		}
 
-		if px >= target.X-ProjectileRadius &&
-			px <= target.X+PlayerWidth+ProjectileRadius &&
-			py >= target.Y-ProjectileRadius &&
-			py <= target.Y+PlayerHeight+ProjectileRadius {
+		hitboxLeft := target.X - PlayerWidth/2
+		hitboxRight := target.X + PlayerWidth/2
+		hitboxTop := target.Y - PlayerHeight/2
+		hitboxBottom := target.Y + PlayerHeight/2
+
+		closestX := clamp(px, hitboxLeft, hitboxRight)
+		closestY := clamp(py, hitboxTop, hitboxBottom)
+
+		dx := px - closestX
+		dy := py - closestY
+		distanceSquared := dx*dx + dy*dy
+		radiusSquared := projectileRadius * projectileRadius
+
+		if distanceSquared < radiusSquared {
 			return id, true
 		}
 	}
@@ -83,6 +93,8 @@ func ApplyDamage(target *Player, attacker *Player) (string, bool) {
 	if target.Combat.HP <= 0 {
 		attacker.Combat.Kills += 1
 		attacker.Combat.HP += 1
+		target.Movements.X = 4000
+		target.Movements.Y = 4000
 	}
 	return "", false
 }

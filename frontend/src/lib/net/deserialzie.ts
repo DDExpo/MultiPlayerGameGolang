@@ -1,19 +1,59 @@
+import { ClientData } from "$lib/stores/game.svelte"
 
-export function readFloat32(view: DataView, offsetRef: { v: number }): number {
-  const value = view.getFloat32(offsetRef.v, true)
-  offsetRef.v += 4
-  return value
+let off:    number
+let view:   DataView
+let buffer: ArrayBuffer
+
+export function initReader(dataView: DataView, arrayBuffer: ArrayBuffer, offset: number = 0) {
+  off    = offset
+  view   = dataView
+  buffer = arrayBuffer
 }
 
-export function readInt32(view: DataView, offsetRef: { v: number }): number {
-  const value = view.getInt32(offsetRef.v, true)
-  offsetRef.v += 4
-  return value
+export function skipBytes(newOffset: number) { off += newOffset }
+
+export function readUint8(): number { return view.getUint8(off++) }
+
+export function readInt16(): number {
+  const val = view.getInt16(off, true)
+  off += 2
+  return val
 }
 
-export function readString( view: DataView, buffer: ArrayBuffer, offsetRef: { v: number }): string {
-  const len = view.getUint8(offsetRef.v++)
-  const bytes = new Uint8Array(buffer, offsetRef.v, len)
-  offsetRef.v += len
-  return new TextDecoder().decode(bytes)
+export function readUint16(): number {
+  const val = view.getUint16(off, true)
+  off += 2
+  return val
+}
+
+export function readFloat32(): number {
+  const val = view.getFloat32(off, true)
+  off += 4
+  return val
+}
+
+export function readString(): string {
+  const len = view.getUint16(off, true)
+  off += 2
+  const str = new TextDecoder().decode(new Uint8Array(buffer, off, len))
+  off += len
+  return str
+}
+
+export function deserializePosition() {
+  return [ readFloat32(), readFloat32(), readFloat32() ]
+}
+
+export function deserializeCombat() {
+
+  ClientData.Hp     = readInt16()
+  ClientData.Kills  = readUint16()
+  ClientData.Damage = readInt16()
+
+}
+
+export function deserializeWeapon() {
+  ClientData.WeaponType  = readUint8()
+  ClientData.WeaponWidth = readUint8()
+  ClientData.WeaponRange = readInt16()
 }

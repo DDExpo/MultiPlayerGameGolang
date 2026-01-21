@@ -12,8 +12,8 @@ const TickDuration = time.Second / TickRate
 
 var DT = float32(TickDuration.Seconds())
 
-const PlayerWidth = 3
-const PlayerHeight = 4
+const PlayerWidth = 21
+const PlayerHeight = 24
 
 const ProjectileSpeed = 358
 const projectileRadius = 3
@@ -23,19 +23,20 @@ const WorldWidth = 8000
 const WorldHeight = 8000
 
 const (
-	UserStateDeltaPOS    byte = 1 << 0 // X, Y, Speed, Angle
+	UserStateDeltaPOS    byte = 1 << 0 // X, Y, Angle
 	UserStateDeltaSTATS  byte = 1 << 1 // HP, Kills, Damage
 	UserStateDeltaWEAPON byte = 1 << 2 // WeaponType, WeaponWidth, WeaponRange
 )
 
 const (
-	MsgTypeUser             byte = 1
-	MsgTypeChat             byte = 2
-	MsgTypeUserState        byte = 3
-	MsgTypeResumeSession    byte = 4
-	MsgTypeInput            byte = 5
-	MsgTypePressedShoot     byte = 6
-	MsgTypeShootStatus      byte = 7
-	MsgTypeUserDead         byte = 8
-	MsgTypeUserResumedDeath byte = 9
+	MsgTypeUserChat           = 1
+	MsgTypeUserState          = 2
+	MsgTypeUserShootStatus    = 3
+	MsgTypeUserResumedDeath   = 4
+	StateTypeUserReg          = 5
+	StateTypeUserDead         = 6
+	StateTypeUserInput        = 7
+	StateTypeUserResume       = 8
+	StateTypeUserCurrentState = 9
+	StateTypeUserPressedShoot = 10
 )

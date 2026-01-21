@@ -25,4 +25,5 @@ func main() {
 
 	log.Println("WS server on :8000")
 	log.Fatal(http.ListenAndServe(":8000", nil))
+
 }

@@ -58,13 +58,12 @@ func (h *Hub) RunGameLoop() {
 
 			applyInput(p)
 			deltaMask := computeDeltaMask(p)
+
 			if deltaMask != 0 {
 				if p.Combat.HP <= 0 {
 					h.broadcast <- SerializeUserDead(p.Meta.Username)
-					p.Movements.X = 4000
-					p.Movements.Y = 4000
 				}
-				msg := SerializeUserStateDelta(MsgTypeUserState, p, deltaMask)
+				msg := SerializeUserCurrentState(deltaMask, p)
 				h.broadcast <- msg
 				updateLastSent(p, deltaMask)
 			}

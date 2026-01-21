@@ -1,7 +1,15 @@
 type Username = string
-type State = [x: number, y: number, angle: number, dead: boolean]
-type Projectile = [x: number, y: number, angle: number, weaponWidth: number, weaponRange: number]
 
-type PlayersState = Record<Username, State>
+type MovementState = [x: number, y: number, angle: number];
+type CombatState   = { dead: boolean };
 
-type Projectiles = Record<Username, Projectile>
+type PlayerState = {
+    movement: MovementState;
+    combat: CombatState;
+};
+
+type PlayersState = Record<Username, PlayerState>
+
+type ProjectileSpawn = [username: string, x: number, y: number, angle: number, ww: number, wr: number]
+
+

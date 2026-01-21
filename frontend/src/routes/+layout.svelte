@@ -1,18 +1,19 @@
 <script lang="ts">
   import '../app.css'
   import favicon from '$lib/assets/favicon.svg'
-  import { onMount, onDestroy } from 'svelte'
+  import { onMount, onDestroy, setContext } from 'svelte'
   import { Game } from '$lib/game/Game'
 	import { closeSocket, getSocket, initSocket, waitForOpen } from '$lib/net/socket';
 	import { ClientData, playersState } from '$lib/stores/game.svelte';
-	import { MsgType } from '$lib/Consts';
+	import { MsgType, StateType } from '$lib/Consts';
 	import { randomBrightColor } from '$lib/utils';
 	import { userUiState } from '$lib/stores/ui.svelte';
-
-  let game: Game
+  
   let container: HTMLDivElement
-
+  let game: Game | null = $state(null)
   let { children } = $props()
+
+  setContext('game', { getGame: () => game })
   
   onMount(async () => {
     try {
@@ -24,16 +25,24 @@
         
         const buffer = new ArrayBuffer(1)
         const view = new DataView(buffer)
-        view.setUint8(0, MsgType.USER_RESUME)
+        view.setUint8(0, StateType.USER_RESUME)
         socket.send(buffer)
-
+        
         const data = await res.json()
         ClientData.Username = data.username
         ClientData.Color = randomBrightColor()
-        playersState[ClientData.Username] = [4000, 4000, 0, true]
-        console.log("Session resumed")
+
+        playersState[ClientData.Username] = { movement: [4000, 4000, 0], combat: { dead: false } }
         userUiState.registered = true
         userUiState.alive      = true
+        
+        if (ClientData.Hp <= 0) {
+          playersState[ClientData.Username].combat.dead = true
+          userUiState.alive   = false
+          userUiState.focused = true
+        }
+        
+        console.log("Session resumed")
       } else {
         console.log("No valid session - user needs to login")
       }
@@ -44,8 +53,9 @@
     game = new Game()
     await game.init()
     game.mount(container)
+    game.setUsernameTextStyle()
   })
-
+  
   onDestroy(() => {
     game?.destroy()
     closeSocket()
@@ -60,7 +70,8 @@
     socket?.send(buffer)
     userUiState.alive   = true
     userUiState.focused = false
-    playersState[ClientData.Username] = [4000, 4000, 0, false]
+    playersState[ClientData.Username].movement    = [4000, 4000, 0]
+    playersState[ClientData.Username].combat.dead = false
   }
 
 </script>
@@ -70,7 +81,9 @@
 </svelte:head>
 
 <div bind:this={container} class="game-root"></div>
+
 <div class="ui-layer"> {@render children()} </div>
+
 {#if !userUiState.alive && userUiState.registered}
   <div class="resume"><button onclick={ resumeGame } > RESUME </button></div>
 {/if}
@@ -106,6 +119,12 @@
     align-content: center;
     inset: 0;
     z-index: 11;
+  }
+
+  .resume button {
+    width: 136px;
+    height: 48px;
+    font-size: large;
   }
 
   .game-root {

@@ -1,11 +1,13 @@
 <script lang="ts">
   import { messages, userUiState } from "$lib/stores/ui.svelte"
-  import { MAX_MESSAGE_LENGTH, MAX_USERNAME_LENGTH, MESSAGE_COOLDOWN_MS, MsgType } from "$lib/Consts"
+  import { MAX_MESSAGE_LENGTH, MAX_USERNAME_LENGTH, MESSAGE_COOLDOWN_MS, MsgType, StateType } from "$lib/Consts"
   import { ClientData, playersState } from "$lib/stores/game.svelte"
   import { getSocket, initSocket, waitForOpen } from "$lib/net/socket"
 	import { randomBrightColor } from "$lib/utils"
 	import { HttpStatus } from "$lib/types/enums"
 	import { serializeChatMsg } from "$lib/net/serialize";
+	import { Game } from "$lib/game/Game";
+	import { getContext } from "svelte";
 
 
   let socket: WebSocket | null
@@ -67,19 +69,26 @@
       
       socket = initSocket()
       const buf = new ArrayBuffer(1);
-      new DataView(buf).setUint8(0, MsgType.USER_REG);
+      new DataView(buf).setUint8(0, StateType.USER_REG);
       
       await waitForOpen(socket)
       socket.send(buf)
 
       userUiState.registered = true
       userUiState.alive      = true
-      playersState[ClientData.Username] = [4000, 4000, 0, false]
+      playersState[ClientData.Username] = { movement: [4000, 4000, 0], combat: { dead: false } }
       ClientData.Color = randomBrightColor()
+
+      const gameContext = getContext<{ getGame: () => Game | null }>('game')
+      const game = gameContext.getGame()
+      if (game) {
+        game.setUsernameTextStyle()
+      } else {
+        console.warn('Game instance not available yet')
+      }
     
     } catch (err) { console.error(`Failed: ${err}`)}
   }
-
 </script>
 
 

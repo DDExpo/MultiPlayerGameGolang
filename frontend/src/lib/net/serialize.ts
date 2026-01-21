@@ -1,5 +1,4 @@
-import { MsgType } from "$lib/Consts"
-import { inputSeq } from "$lib/stores/game.svelte"
+import { MsgType, StateType } from "$lib/Consts"
 
 export function serializeChatMsg(text: string, color: string): ArrayBuffer {
   const encoder    = new TextEncoder()
@@ -33,7 +32,7 @@ export function serializeInputMsg(dx: number, dy: number, isDash: boolean, angle
   const view = new DataView(buffer)
   let offset = 0
 
-  view.setUint8(offset++, MsgType.USER_INPUT)
+  view.setUint8(offset++, StateType.USER_INPUT)
   view.setInt8(offset++, dx)
   view.setInt8(offset++, dy)
   view.setFloat32(offset, angle, true)

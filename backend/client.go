@@ -40,26 +40,23 @@ func (c *Client) ReadPump() {
 			break
 		}
 		switch message[0] {
-		case MsgTypeUser:
-			c.handleUserRegistration()
-		case MsgTypeChat:
+		case MsgTypeUserChat:
 			c.handleChatMessage(message[1:])
-		case MsgTypeInput:
-			c.handleUserInput(message[1:])
-		case MsgTypePressedShoot:
-			c.handleUserPressedShoot(message[1:])
-		case MsgTypeShootStatus:
-			c.handleUserShootStatus()
-		case MsgTypeResumeSession:
+		case StateTypeUserReg:
+			c.handleUserRegistration()
+		case StateTypeUserResume:
 			c.handleUserResumeSession()
-		case MsgTypeUserResumedDeath:
+		case StateTypeUserInput:
+			c.handleUserInput(message[1:])
+		case StateTypeUserPressedShoot:
+			c.handleUserPressedShoot(message[1:])
+		case StateTypeUserDead:
 			c.handleUserResumedDeath()
 		default:
 			log.Printf("unknown message type: %d", message[0])
 		}
 	}
 }
-
 func (c *Client) WritePump() {
 	defer c.conn.Close()
 
@@ -74,17 +71,7 @@ func (c *Client) WritePump() {
 }
 
 func (c *Client) handleUserRegistration() {
-	msg := SerializeUserStateDelta(MsgTypeUserState, c.player, UserStateDeltaPOS|UserStateDeltaSTATS|UserStateDeltaWEAPON)
-	c.hub.broadcast <- msg
-}
-
-func (c *Client) handleChatMessage(data []byte) {
-	text, color, err := DeserializeUserMsg(data)
-	if err != nil {
-		log.Printf("Problem with deserializing user text: %s color: %s err: %v", text, color, err)
-	}
-
-	msg := SerializeUserMsg(c.player.Meta.Username, text, time.Now().UTC().Format("2006-01-02 15:04"), color)
+	msg := SerializeUserReg(c.player)
 	c.hub.broadcast <- msg
 }
 
@@ -95,9 +82,8 @@ func (c *Client) handleUserInput(data []byte) {
 	offset++
 	moveY := int8(data[offset])
 	offset++
-	angle := math.Float32frombits(binary.LittleEndian.Uint32(data[offset:]))
+	angle := math.Float32frombits(binary.LittleEndian.Uint32(data[offset : offset+4]))
 	offset += 4
-
 	dash := data[offset] != 0
 	c.player.Input = PlayerInput{
 		MoveX: moveX,
@@ -109,25 +95,29 @@ func (c *Client) handleUserInput(data []byte) {
 
 func (c *Client) handleUserPressedShoot(data []byte) {
 	mu.Lock()
-	Projectiles = append(Projectiles, CreateProjectile(c.player, binary.BigEndian.Uint32(data)))
+	Projectiles = append(Projectiles, CreateProjectile(c.player, binary.LittleEndian.Uint16(data)))
 	mu.Unlock()
 
-	msg := SerializeUserStateDelta(MsgTypePressedShoot, c.player, UserStateDeltaPOS|UserStateDeltaSTATS|UserStateDeltaWEAPON)
+	msg := SerializeUserPressedShoot(c.player)
 	c.hub.broadcast <- msg
 }
 
-func (c *Client) handleUserShootStatus() {
-}
-
 func (c *Client) handleUserResumedDeath() {
-	log.Println(c.player.Combat.HP)
 	ResetStats(c.player)
-	log.Println(c.player.Combat.HP)
-	msg := SerializeUserStateDelta(MsgTypeUserState, c.player, UserStateDeltaPOS|UserStateDeltaSTATS|UserStateDeltaWEAPON)
+	msg := SerializeUserReg(c.player)
 	c.hub.broadcast <- msg
 }
 
 func (c *Client) handleUserResumeSession() {
-	msg := SerializeUserStateDelta(MsgTypeUserState, c.player, UserStateDeltaPOS|UserStateDeltaSTATS|UserStateDeltaWEAPON)
+	msg := SerializeUserReg(c.player)
+	c.hub.broadcast <- msg
+}
+
+func (c *Client) handleChatMessage(data []byte) {
+	text, color, err := DeserializeUserMsg(data)
+	if err != nil {
+		log.Printf("Problem with deserializing user text: %s color: %s err: %v", text, color, err)
+	}
+	msg := SerializeUserChat(c.player.Meta.Username, text, time.Now().UTC().Format("2006-01-02 15:04"), color)
 	c.hub.broadcast <- msg
 }
