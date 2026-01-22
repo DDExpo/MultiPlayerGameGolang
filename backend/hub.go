@@ -2,8 +2,8 @@ package main
 
 import (
 	"log"
+	"multiplayerGame/game"
 	"sync"
-	"time"
 )
 
 type Hub struct {
@@ -11,7 +11,7 @@ type Hub struct {
 	register        chan *Client
 	unregister      chan *Client
 	broadcast       chan []byte
-	players         map[string]*Player
+	players         map[string]*game.Player
 	activeUsernames map[string]bool
 	mu              sync.RWMutex
 }
@@ -22,52 +22,8 @@ func NewHub() *Hub {
 		register:        make(chan *Client),
 		unregister:      make(chan *Client),
 		broadcast:       make(chan []byte, 1024),
-		players:         make(map[string]*Player),
+		players:         make(map[string]*game.Player),
 		activeUsernames: make(map[string]bool),
-	}
-}
-
-func (h *Hub) RunGameLoop() {
-	ticker := time.NewTicker(TickDuration)
-	defer ticker.Stop()
-
-	for range ticker.C {
-		for _, p := range h.players {
-
-			now := time.Now()
-			mu.Lock()
-			aliveProjectiles := Projectiles[:0]
-			for _, prj := range Projectiles {
-				alive, hit := simulateProjectile(prj, now)
-				if !alive {
-					if len(hit) > 0 {
-						htarget, ok1 := h.players[hit]
-						attacker, ok2 := h.players[prj.OwnerId]
-						if ok1 && ok2 {
-							ApplyDamage(htarget, attacker)
-						}
-					}
-					msg := SerializeUserShootStatus(alive, prj.ProjectileId)
-					h.broadcast <- msg
-					continue
-				}
-				aliveProjectiles = append(aliveProjectiles, prj)
-			}
-			Projectiles = aliveProjectiles
-			mu.Unlock()
-
-			applyInput(p)
-			deltaMask := computeDeltaMask(p)
-
-			if deltaMask != 0 {
-				if p.Combat.HP <= 0 {
-					h.broadcast <- SerializeUserDead(p.Meta.Username)
-				}
-				msg := SerializeUserCurrentState(deltaMask, p)
-				h.broadcast <- msg
-				updateLastSent(p, deltaMask)
-			}
-		}
 	}
 }
 
@@ -85,12 +41,10 @@ func (h *Hub) Run() {
 
 				h.mu.Lock()
 				delete(h.players, client.player.Meta.SessionID)
-				delete(h.activeUsernames, client.player.Meta.Username)
+				h.activeUsernames[client.player.Meta.Username] = false
 				h.mu.Unlock()
 
-				FastProjectileCheck.mu.Lock()
-				FastProjectileCheck.Remove(client.player.Meta.Username)
-				FastProjectileCheck.mu.Unlock()
+				game.FastProjectileCheck.Remove(client.player.Meta.Username)
 
 				log.Printf("Client unregistered: %s", client.player.Meta.Username)
 			}

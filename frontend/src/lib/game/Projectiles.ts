@@ -13,6 +13,7 @@ export class Projectile {
   range: number
   id: number
   spawnTime: number
+  lastUpdateTime: number
 
   constructor(id: number, x: number, y: number, angle: number, speed: number,
               ownerId: string, width: number,  range: number )
@@ -21,6 +22,7 @@ export class Projectile {
     this.x = x
     this.y = y
     this.spawnTime = performance.now()
+    this.lastUpdateTime = this.spawnTime
     this.ownerId = ownerId
     this.width = width
     this.range = range
@@ -43,12 +45,12 @@ export class Projectile {
     this.x = x
     this.y = y
     this.spawnTime = performance.now()
+    this.lastUpdateTime = this.spawnTime
     this.ownerId = ownerId
     this.width = width
     this.range = range
     this.lifetime = PROJECTILE_LIFE * range
     this.sprite.visible = true
-
     this.sprite.position.set(x, y)
     this.sprite.angle = angle
 
@@ -58,15 +60,17 @@ export class Projectile {
   }
 
   update(currentTime: number) {
-    const elapsed = (currentTime - this.spawnTime) / 1000
-    this.sprite.x = this.x + this.vx * elapsed
-    this.sprite.y = this.y + this.vy * elapsed
+    const dt = (currentTime - this.lastUpdateTime) / 1000
+    this.x += this.vx * dt
+    this.y += this.vy * dt
+    this.sprite.position.set(this.x, this.y)
+    this.lastUpdateTime = currentTime
   }
 
   hasExpired(currentTime: number): boolean {
-    const elapsed = (currentTime - this.spawnTime) / 1000
-    return elapsed >= this.lifetime
+    return (currentTime - this.spawnTime) / 1000 >= this.lifetime
   }
+
 }
 
 export class ProjectilePool {
@@ -74,33 +78,20 @@ export class ProjectilePool {
   private inactive: Projectile[] = []
   private container: Container
   private availableIds: number[] = []
-  private nextId = 0
-  private readonly MAX_ID = 65535
 
-  constructor(container: Container) {
-    this.container = container
-  }
+  constructor(container: Container) { this.container = container }
 
-  private getNextId(): number {
-    if (this.availableIds.length > 0) {
-      return this.availableIds.pop()!
-    }
-
-    const id = this.nextId
-    this.nextId = (this.nextId + 1) % this.MAX_ID
-    return id
-  }
-
-  spawn(x: number, y: number, angle: number, ownerId: string, width: number, range: number): number
+  spawn(
+    id: number, x: number, y: number, angle: number, ownerId: string,
+    speed: number, width: number, range: number): number
   {
-    const id = this.getNextId()
     let projectile: Projectile
 
     if (this.inactive.length > 0) {
       projectile = this.inactive.pop()!
-      projectile.reset(id, x, y, angle, PROJECTILE_SPEED, ownerId, width, range)
+      projectile.reset(id, x, y, angle, PROJECTILE_SPEED * speed, ownerId, width, range)
     } else {
-      projectile = new Projectile(id, x, y, angle, PROJECTILE_SPEED, ownerId, width, range)
+      projectile = new Projectile(id, x, y, angle, PROJECTILE_SPEED * speed, ownerId, width, range)
       this.container.addChild(projectile.sprite)
     }
 

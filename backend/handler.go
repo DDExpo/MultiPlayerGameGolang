@@ -10,6 +10,7 @@ import (
 	"time"
 
 	db "multiplayerGame/database"
+	"multiplayerGame/game"
 
 	"github.com/gorilla/websocket"
 )
@@ -61,7 +62,7 @@ func IsSessionResume(h *Hub, w http.ResponseWriter, r *http.Request) {
 
 	if !exists {
 		h.mu.Lock()
-		h.players[key] = NewPlayer(username, cookie.Value)
+		h.players[key] = game.NewPlayer(username, cookie.Value)
 		h.activeUsernames[username] = true
 		h.mu.Unlock()
 
@@ -153,7 +154,7 @@ func InitSession(h *Hub, w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("Created new session for user '%s': %s", trimmedUsername, sessionID)
 	h.mu.Lock()
-	h.players[sessionID[:16]] = NewPlayer(trimmedUsername, sessionID)
+	h.players[sessionID[:16]] = game.NewPlayer(trimmedUsername, sessionID)
 	h.activeUsernames[trimmedUsername] = true
 	h.mu.Unlock()
 
@@ -169,7 +170,7 @@ func ServeWS(hub *Hub, w http.ResponseWriter, r *http.Request) {
 	}
 
 	hub.mu.RLock()
-	var player *Player = hub.players[cookie.Value[:16]]
+	player := hub.players[cookie.Value[:16]]
 	hub.mu.RUnlock()
 
 	if player == nil {
@@ -185,10 +186,6 @@ func ServeWS(hub *Hub, w http.ResponseWriter, r *http.Request) {
 	}
 
 	client := NewClient(hub, conn, player)
-
-	hub.mu.Lock()
-	player.IsConnected = true
-	hub.mu.Unlock()
 
 	hub.register <- client
 

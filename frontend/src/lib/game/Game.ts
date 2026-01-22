@@ -17,6 +17,7 @@ export class Game {
   starfield:            Container
   projectilesContainer: Container
   userName:             Text
+  fpsText!:             Text
 
   screenCenterX:        number
   screenCenterY:        number
@@ -45,6 +46,22 @@ export class Game {
       antialias: false,
       resolution: window.devicePixelRatio || 1,
     })
+
+    this.fpsText = new Text({
+      text: "FPS: 0",
+      style: new TextStyle({
+        fontFamily: "PixelUI",
+        fontSize: 8,
+        fill: 0x00ff00,
+      }),
+      resolution: 2,
+    })
+
+    this.fpsText.position.set(10, 10)
+    this.fpsText.zIndex = 9999
+    this.app.stage.addChild(this.fpsText)
+
+
     this.screenCenterX = this.app.screen.width  / 2
     this.screenCenterY = this.app.screen.height / 2
 
@@ -88,10 +105,31 @@ export class Game {
     
     this.userName.anchor.set(0.5, 1)
     this.world.addChild(this.userName)
+
+
+    let frameCount = 0
+    let lastTime = performance.now()
     
     this.app.ticker.add((t) => {
+
+      frameCount++
+      const now = performance.now()
+
+      if (now - lastTime >= 1000) {
+        this.fpsText.text = `FPS: ${frameCount}`
+        frameCount = 0
+        lastTime = now
+      }
+      
       const socket = getSocket()
       const socketReady = socket?.readyState === WebSocket.OPEN
+     
+     
+      for (const [usr, id, x, y, angle, ws, ww, wr] of projectileQueue) {
+        projectilePool!.spawn(id, x, y, angle, usr, ws, ww, wr)
+      }
+      projectileQueue.length = 0
+      projectilePool!.update()
       
       for (const [usr, state] of Object.entries(playersState)) {
         const { movement, combat } = state
@@ -130,17 +168,12 @@ export class Game {
           textUser.position.set(x, y + PADDING_USERNAME)
         }
       }
-      for (const [usr, x, y, angle, ww, wr] of projectileQueue) {
-        projectilePool!.spawn(x, y, angle, usr, ww, wr)
-      }
-      projectileQueue.length = 0
-      projectilePool!.update()
       
       
       if (!userUiState.registered || userUiState.focused) return
       
-      if (!this.userName.text) { this.setUsernameTextStyle() }
 
+      if (!this.userName.text) { this.setUsernameTextStyle() }
 
       let lastDx = 0, lastDy = 0
       
@@ -186,16 +219,8 @@ export class Game {
       if (controller.keys.space.pressed && !this.isSafeZone(playerWorldCords.X, playerWorldCords.Y)) {
         const now = performance.now()
         if (now - this.lastShotTime >= this.shootCooldown) {
-          const projectileId = projectilePool!.spawn(
-            playerWorldCords.X, playerWorldCords.Y, player.angle,
-            ClientData.Username, ClientData.WeaponWidth, ClientData.WeaponRange,
-          )
           if (socketReady) { 
-            const buffer = new ArrayBuffer(3)
-            const view = new DataView(buffer)
-            view.setUint8(0, StateType.USER_PRESSED_SHOOT)
-            view.setUint16(1, projectileId, true)
-            socket.send(buffer)
+            socket.send(Uint8Array.of(StateType.USER_PRESSED_SHOOT))
           }
           this.lastShotTime = now
       }}
@@ -207,7 +232,22 @@ export class Game {
     })
   }
   
-  createStarfield() {
+  public mount(el: HTMLElement) {
+    el.appendChild(this.app.canvas)
+    this.world.position.set(this.screenCenterX, this.screenCenterY)
+  }
+  
+  public setUsernameTextStyle() {
+    this.userName.text = ClientData.Username
+    this.userName.style = new TextStyle({ fontSize: 10, fontFamily: "PixelUI", fill: ClientData.Color})
+    this.userName.resolution = 2
+  }
+  
+  public destroy() {
+    this.app.destroy(true)
+  }
+  
+  private createStarfield() {
     if (this.starfield.children.length > 0) return
     
     const starCount = 2000
@@ -227,21 +267,6 @@ export class Game {
     
     this.starfield.addChild(stars)
     this.starfield.enableRenderGroup()
-  }
-  
-  public mount(el: HTMLElement) {
-    el.appendChild(this.app.canvas)
-    this.world.position.set(this.screenCenterX, this.screenCenterY)
-  }
-  
-  public setUsernameTextStyle() {
-    this.userName.text = ClientData.Username
-    this.userName.style = new TextStyle({ fontSize: 10, fontFamily: "PixelUI", fill: ClientData.Color})
-    this.userName.resolution = 2
-  }
-  
-  public destroy() {
-    this.app.destroy(true)
   }
 
   private isSafeZone(x: number, y: number): boolean {

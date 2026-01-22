@@ -1,27 +1,16 @@
-package main
-
-import (
-	"sync"
-	"time"
-)
-
-var mu sync.Mutex
-var Projectiles []*Projectile = []*Projectile{}
+package game
 
 var FastProjectileCheck = NewSpatialHash(400)
 
-func applyInput(p *Player) {
+func ApplyInput(p *Player) {
 
+	p.Movements.Speed = 100.0
 	if p.Input.Dash {
-		p.Movements.Speed = 2
-	} else {
-		p.Movements.Speed = 1
+		p.Movements.Speed = 200.0
 	}
 
-	moveSpeed := float32(p.Movements.Speed) * 100.0
-
-	p.Movements.X += float32(p.Input.MoveX) * moveSpeed * DT
-	p.Movements.Y += float32(p.Input.MoveY) * moveSpeed * DT
+	p.Movements.X += p.Input.MoveX * p.Movements.Speed * DT
+	p.Movements.Y += p.Input.MoveY * p.Movements.Speed * DT
 
 	if p.Movements.X < 0 || p.Movements.Y < 0 || p.Movements.X > WorldWidth || p.Movements.Y > WorldHeight {
 		p.Movements.X = 4000
@@ -31,30 +20,7 @@ func applyInput(p *Player) {
 	FastProjectileCheck.Update(p.Meta.SessionID[:16], p.Movements.X, p.Movements.Y)
 	p.Movements.Angle = p.Input.Angle
 }
-func simulateProjectile(p *Projectile, now time.Time) (bool, string) {
-	elapsed := float32(now.Sub(p.SpawnTime).Seconds())
 
-	px := p.X + p.VX*elapsed
-	py := p.Y + p.VY*elapsed
-
-	if hit, ok := CheckCollision(px, py, p.Radius, p.OwnerId); ok {
-		return false, hit
-	}
-
-	if px >= 3590 && px <= 4410 && py >= 3590 && py <= 4410 {
-		return false, ""
-	}
-
-	if px < 0 || py < 0 || px > WorldWidth || py > WorldHeight {
-		return false, ""
-	}
-
-	if elapsed >= p.LifeTime {
-		return false, ""
-	}
-
-	return true, ""
-}
 func CheckCollision(px, py float32, projectileRadius float32, owner string) (string, bool) {
 
 	cell := FastProjectileCheck.GetCell(px, py)
@@ -88,7 +54,7 @@ func CheckCollision(px, py float32, projectileRadius float32, owner string) (str
 	return "", false
 }
 
-func ApplyDamage(target *Player, attacker *Player) (string, bool) {
+func ApplyDamage(target *Player, attacker *Player) {
 	target.Combat.HP -= attacker.Combat.Damage
 	if target.Combat.HP <= 0 {
 		attacker.Combat.Kills += 1
@@ -96,5 +62,14 @@ func ApplyDamage(target *Player, attacker *Player) (string, bool) {
 		target.Movements.X = 4000
 		target.Movements.Y = 4000
 	}
-	return "", false
+}
+
+func clamp(value, min, max float32) float32 {
+	if value < min {
+		return min
+	}
+	if value > max {
+		return max
+	}
+	return value
 }

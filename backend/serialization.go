@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/binary"
 	"math"
+	"multiplayerGame/game"
 )
 
 type BinaryWriter struct {
@@ -42,7 +43,7 @@ func (w *BinaryWriter) WriteString(s string) {
 	w.buf = append(w.buf, []byte(s)...)
 }
 
-func SerializeUserReg(p *Player) []byte {
+func SerializeUserReg(p *game.Player) []byte {
 	w := NewBinaryWriter()
 	w.WriteUint8(MsgTypeUserState)
 	w.WriteUint8(StateTypeUserReg)
@@ -54,6 +55,7 @@ func SerializeUserReg(p *Player) []byte {
 	w.WriteUint16(p.Combat.Kills)
 	w.WriteInt16(p.Combat.Damage)
 	w.WriteUint8(p.Combat.WeaponType)
+	w.WriteUint8(p.Combat.WeaponSpeed)
 	w.WriteUint8(p.Combat.WeaponWidth)
 	w.WriteUint16(p.Combat.WeaponRange)
 	return w.Bytes()
@@ -67,7 +69,7 @@ func SerializeUserDead(username string) []byte {
 	return w.Bytes()
 }
 
-func SerializeUserCurrentState(deltaMask uint8, p *Player) []byte {
+func SerializeUserCurrentState(deltaMask uint8, p *game.Player) []byte {
 	w := NewBinaryWriter()
 	w.WriteUint8(MsgTypeUserState)
 	w.WriteUint8(StateTypeUserCurrentState)
@@ -88,6 +90,7 @@ func SerializeUserCurrentState(deltaMask uint8, p *Player) []byte {
 
 	if deltaMask&UserStateDeltaWEAPON != 0 {
 		w.WriteUint8(p.Combat.WeaponType)
+		w.WriteUint8(p.Combat.WeaponType)
 		w.WriteUint8(p.Combat.WeaponWidth)
 		w.WriteUint16(p.Combat.WeaponRange)
 	}
@@ -95,7 +98,7 @@ func SerializeUserCurrentState(deltaMask uint8, p *Player) []byte {
 	return w.Bytes()
 }
 
-func SerializeUserPressedShoot(p *Player) []byte {
+func SerializeUserPressedShoot(p *game.Player, prjctlID uint32) []byte {
 	w := NewBinaryWriter()
 	w.WriteUint8(MsgTypeUserState)
 	w.WriteUint8(StateTypeUserPressedShoot)
@@ -103,20 +106,23 @@ func SerializeUserPressedShoot(p *Player) []byte {
 	w.WriteFloat32(p.Movements.X)
 	w.WriteFloat32(p.Movements.Y)
 	w.WriteFloat32(p.Movements.Angle)
+	w.WriteUint8(p.Combat.WeaponType)
+	w.WriteUint8(p.Combat.WeaponSpeed)
 	w.WriteUint8(p.Combat.WeaponWidth)
 	w.WriteUint16(p.Combat.WeaponRange)
+	w.WriteUint32(prjctlID)
 	return w.Bytes()
 }
 
-func SerializeUserShootStatus(alive bool, id uint16) []byte {
+func SerializeUserShootStatus(dead bool, id uint32) []byte {
 	w := NewBinaryWriter()
 	w.WriteUint8(MsgTypeUserShootStatus)
-	if alive {
-		w.WriteUint8(1)
-	} else {
+	if dead {
 		w.WriteUint8(0)
+	} else {
+		w.WriteUint8(1)
 	}
-	w.WriteUint16(id)
+	w.WriteUint32(id)
 	return w.Bytes()
 }
 

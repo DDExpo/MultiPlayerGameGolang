@@ -4,7 +4,7 @@ import { MsgType, StateType } from "$lib/Consts"
 import { UserStateDelta } from "$lib/types/enums"
 import { projectilePool } from "$lib/game/Projectiles"
 import { deserializeCombat, deserializePosition, deserializeWeapon,
-         initReader, readString, readUint16, readUint8 } from "./deserialzie"
+         initReader, readString, readUint32, readUint8 } from "./deserialzie"
 
 let socket: WebSocket | null = null
 
@@ -39,10 +39,9 @@ function createSocket(url: string) {
 
     case MsgType.USER_SHOOT_STATUS: {
       console.log("user_shoot_status")
-      const alive = readUint8()
-      const id    = readUint16()
-      console.log(alive, id)
-      if (!alive && projectilePool) projectilePool.destroy(id)
+      const dead = readUint8()
+      const id   = readUint32()
+      if (dead && projectilePool) { projectilePool.destroy(id) }
       break
     }
 
@@ -59,14 +58,12 @@ function createSocket(url: string) {
           player.combat.dead = false
 
           if (username === ClientData.Username) {
-            deserializeCombat()
-            deserializeWeapon()
+            deserializeCombat(true)
+            deserializeWeapon(true)
           }
-
           break
         }
 
-        // 🔹 death event
         case StateType.USER_DEAD: {
           player.combat.dead = true
 
@@ -86,19 +83,16 @@ function createSocket(url: string) {
           }
 
           if (username === ClientData.Username) {
-            if (deltaMask & UserStateDelta.STATS)  deserializeCombat()
-            if (deltaMask & UserStateDelta.WEAPON) deserializeWeapon()
+            if (deltaMask & UserStateDelta.STATS)  deserializeCombat(true)
+            if (deltaMask & UserStateDelta.WEAPON) deserializeWeapon(true)
           }
-
           break
         }
         case StateType.USER_PRESSED_SHOOT: {
-          if (username !== ClientData.Username) {
-            const [x, y, angle] = deserializePosition()
-            const weaponWidth  = readUint8()
-            const weaponRange  = readUint16()
-            projectileQueue.push([username, x, y, angle, weaponWidth, weaponRange])
-          }
+          const [x, y, angle] = deserializePosition()
+          const [_, weaponSpeed, weaponWidth, weaponRange] = deserializeWeapon(false)!
+          const id            = readUint32()
+          projectileQueue.push([username, id, x, y, angle, weaponSpeed, weaponWidth, weaponRange])
           break
         }
       }

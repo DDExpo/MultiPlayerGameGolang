@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"log"
 	"math"
+	"multiplayerGame/game"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -13,10 +14,10 @@ type Client struct {
 	hub    *Hub
 	conn   *websocket.Conn
 	send   chan []byte
-	player *Player
+	player *game.Player
 }
 
-func NewClient(hub *Hub, conn *websocket.Conn, player *Player) *Client {
+func NewClient(hub *Hub, conn *websocket.Conn, player *game.Player) *Client {
 
 	return &Client{
 		hub:    hub,
@@ -49,8 +50,8 @@ func (c *Client) ReadPump() {
 		case StateTypeUserInput:
 			c.handleUserInput(message[1:])
 		case StateTypeUserPressedShoot:
-			c.handleUserPressedShoot(message[1:])
-		case StateTypeUserDead:
+			c.handleUserPressedShoot()
+		case MsgTypeUserResumedDeath:
 			c.handleUserResumedDeath()
 		default:
 			log.Printf("unknown message type: %d", message[0])
@@ -71,46 +72,41 @@ func (c *Client) WritePump() {
 }
 
 func (c *Client) handleUserRegistration() {
-	msg := SerializeUserReg(c.player)
-	c.hub.broadcast <- msg
+	c.hub.broadcast <- SerializeUserReg(c.player)
 }
 
 func (c *Client) handleUserInput(data []byte) {
 
 	offset := 0
-	moveX := int8(data[offset])
-	offset++
-	moveY := int8(data[offset])
-	offset++
+	moveX := math.Float32frombits(binary.LittleEndian.Uint32(data[offset : offset+4]))
+	offset += 4
+	moveY := math.Float32frombits(binary.LittleEndian.Uint32(data[offset : offset+4]))
+	offset += 4
 	angle := math.Float32frombits(binary.LittleEndian.Uint32(data[offset : offset+4]))
 	offset += 4
 	dash := data[offset] != 0
-	c.player.Input = PlayerInput{
+
+	c.player.Input = game.PlayerInput{
 		MoveX: moveX,
 		MoveY: moveY,
-		Dash:  dash,
 		Angle: angle,
+		Dash:  dash,
 	}
 }
 
-func (c *Client) handleUserPressedShoot(data []byte) {
-	mu.Lock()
-	Projectiles = append(Projectiles, CreateProjectile(c.player, binary.LittleEndian.Uint16(data)))
-	mu.Unlock()
-
-	msg := SerializeUserPressedShoot(c.player)
-	c.hub.broadcast <- msg
+func (c *Client) handleUserPressedShoot() {
+	projectile := game.CreateProjectile(c.player)
+	c.hub.broadcast <- SerializeUserPressedShoot(c.player, projectile.ProjectileId)
+	game.AddProjectile(projectile)
 }
 
 func (c *Client) handleUserResumedDeath() {
-	ResetStats(c.player)
-	msg := SerializeUserReg(c.player)
-	c.hub.broadcast <- msg
+	game.ResetStats(c.player)
+	c.hub.broadcast <- SerializeUserReg(c.player)
 }
 
 func (c *Client) handleUserResumeSession() {
-	msg := SerializeUserReg(c.player)
-	c.hub.broadcast <- msg
+	c.hub.broadcast <- SerializeUserReg(c.player)
 }
 
 func (c *Client) handleChatMessage(data []byte) {
@@ -118,6 +114,5 @@ func (c *Client) handleChatMessage(data []byte) {
 	if err != nil {
 		log.Printf("Problem with deserializing user text: %s color: %s err: %v", text, color, err)
 	}
-	msg := SerializeUserChat(c.player.Meta.Username, text, time.Now().UTC().Format("2006-01-02 15:04"), color)
-	c.hub.broadcast <- msg
+	c.hub.broadcast <- SerializeUserChat(c.player.Meta.Username, text, time.Now().UTC().Format("2006-01-02 15:04"), color)
 }

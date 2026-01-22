@@ -1,4 +1,4 @@
-package main
+package game
 
 import "sync"
 
@@ -31,6 +31,9 @@ func (s *SpatialHash) hash(x, y float32) int64 {
 }
 
 func (s *SpatialHash) Update(id string, x, y float32) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	key := s.hash(x, y)
 
 	if oldKey, ok := s.playerCell[id]; ok && oldKey != key {
@@ -53,10 +56,14 @@ func (s *SpatialHash) Update(id string, x, y float32) {
 }
 
 func (s *SpatialHash) Remove(id string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	key, ok := s.playerCell[id]
 	if !ok {
 		return
 	}
+
 	if cell := s.grid[key]; cell != nil {
 		delete(cell, id)
 		if len(cell) == 0 {
@@ -68,6 +75,8 @@ func (s *SpatialHash) Remove(id string) {
 }
 
 func (s *SpatialHash) GetCell(x, y float32) map[string]Vec2 {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	return s.grid[s.hash(x, y)]
 }
 

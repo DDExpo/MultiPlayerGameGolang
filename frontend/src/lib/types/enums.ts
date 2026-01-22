@@ -1,8 +1,8 @@
 
 export enum UserStateDelta {
-  POS    = 1 << 0, // X, Y, speed, angle
-  STATS  = 1 << 1,
-  WEAPON = 1 << 2,
+  POS    = 1 << 0, // X, Y, angle
+  STATS  = 1 << 1, // HP, Kills, Damage
+  WEAPON = 1 << 2, // WeaponType, WeaponSpeed, WeaponWidth, WeaponRange
 }
 
 export enum HttpStatus {
