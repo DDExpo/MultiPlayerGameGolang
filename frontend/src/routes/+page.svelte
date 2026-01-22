@@ -6,9 +6,6 @@
 	import { randomBrightColor } from "$lib/utils"
 	import { HttpStatus } from "$lib/types/enums"
 	import { serializeChatMsg } from "$lib/net/serialize";
-	import { Game } from "$lib/game/Game";
-	import { getContext } from "svelte";
-
 
   let socket: WebSocket | null
   let hide: boolean                    = $state(true)
@@ -17,7 +14,6 @@
   let place: string                    = $state("")
   let errorTimeout: number | null      = null
   let lastTimeMessageSent: Date | null = null
-
 
   function showError(msg: string, pl: string) {
     error = msg
@@ -78,14 +74,6 @@
       userUiState.alive      = true
       playersState[ClientData.Username] = { movement: [4000, 4000, 0], combat: { dead: false } }
       ClientData.Color = randomBrightColor()
-
-      const gameContext = getContext<{ getGame: () => Game | null }>('game')
-      const game = gameContext.getGame()
-      if (game) {
-        game.setUsernameTextStyle()
-      } else {
-        console.warn('Game instance not available yet')
-      }
     
     } catch (err) { console.error(`Failed: ${err}`)}
   }

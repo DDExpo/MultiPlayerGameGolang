@@ -38,8 +38,10 @@ function createSocket(url: string) {
     }
 
     case MsgType.USER_SHOOT_STATUS: {
+      console.log("user_shoot_status")
       const alive = readUint8()
       const id    = readUint16()
+      console.log(alive, id)
       if (!alive && projectilePool) projectilePool.destroy(id)
       break
     }

@@ -1,7 +1,7 @@
 <script lang="ts">
   import '../app.css'
   import favicon from '$lib/assets/favicon.svg'
-  import { onMount, onDestroy, setContext } from 'svelte'
+  import { onMount, onDestroy } from 'svelte'
   import { Game } from '$lib/game/Game'
 	import { closeSocket, getSocket, initSocket, waitForOpen } from '$lib/net/socket';
 	import { ClientData, playersState } from '$lib/stores/game.svelte';
@@ -10,11 +10,9 @@
 	import { userUiState } from '$lib/stores/ui.svelte';
   
   let container: HTMLDivElement
-  let game: Game | null = $state(null)
+  let game: Game
   let { children } = $props()
 
-  setContext('game', { getGame: () => game })
-  
   onMount(async () => {
     try {
       const res = await fetch("http://localhost:8000/session-resume", { credentials: "include" })

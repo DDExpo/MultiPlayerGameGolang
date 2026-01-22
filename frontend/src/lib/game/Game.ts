@@ -139,7 +139,9 @@ export class Game {
       
       if (!userUiState.registered || userUiState.focused) return
       
-      
+      if (!this.userName.text) { this.setUsernameTextStyle() }
+
+
       let lastDx = 0, lastDy = 0
       
       const dx = (controller.keys.right.pressed ? 1 : 0) - (controller.keys.left.pressed ? 1 : 0)
@@ -189,10 +191,10 @@ export class Game {
             ClientData.Username, ClientData.WeaponWidth, ClientData.WeaponRange,
           )
           if (socketReady) { 
-            const buffer = new ArrayBuffer(5)
+            const buffer = new ArrayBuffer(3)
             const view = new DataView(buffer)
             view.setUint8(0, StateType.USER_PRESSED_SHOOT)
-            view.setUint32(1, projectileId)
+            view.setUint16(1, projectileId, true)
             socket.send(buffer)
           }
           this.lastShotTime = now
