@@ -11,6 +11,7 @@ type Hub struct {
 	register        chan *Client
 	unregister      chan *Client
 	broadcast       chan []byte
+	gameCmd         chan GameCommand
 	players         map[string]*game.Player
 	activeUsernames map[string]bool
 	mu              sync.RWMutex
@@ -22,6 +23,7 @@ func NewHub() *Hub {
 		register:        make(chan *Client),
 		unregister:      make(chan *Client),
 		broadcast:       make(chan []byte, 1024),
+		gameCmd:         make(chan GameCommand, 256),
 		players:         make(map[string]*game.Player),
 		activeUsernames: make(map[string]bool),
 	}

@@ -71,10 +71,6 @@ func (c *Client) WritePump() {
 	}
 }
 
-func (c *Client) handleUserRegistration() {
-	c.hub.broadcast <- SerializeUserReg(c.player)
-}
-
 func (c *Client) handleUserInput(data []byte) {
 
 	offset := 0
@@ -86,29 +82,20 @@ func (c *Client) handleUserInput(data []byte) {
 	offset += 4
 	dash := data[offset] != 0
 
-	c.player.Input = game.PlayerInput{
-		MoveX: moveX,
-		MoveY: moveY,
-		Angle: angle,
-		Dash:  dash,
-	}
+	c.hub.gameCmd <- UserInputCmd{c.player, game.PlayerInput{MoveX: moveX, MoveY: moveY, Angle: angle, Dash: dash}}
 }
-
+func (c *Client) handleUserRegistration() {
+	c.hub.gameCmd <- UserRegistrationCmd{c.player}
+}
 func (c *Client) handleUserPressedShoot() {
-	projectile := game.CreateProjectile(c.player)
-	c.hub.broadcast <- SerializeUserPressedShoot(c.player, projectile.ProjectileId)
-	game.AddProjectile(projectile)
+	c.hub.gameCmd <- SpawnProjectileCmd{c.player}
 }
-
 func (c *Client) handleUserResumedDeath() {
-	game.ResetStats(c.player)
-	c.hub.broadcast <- SerializeUserReg(c.player)
+	c.hub.gameCmd <- UserResumedDeathCmd{c.player}
 }
-
 func (c *Client) handleUserResumeSession() {
-	c.hub.broadcast <- SerializeUserReg(c.player)
+	c.hub.gameCmd <- UserResumeSession{c.player}
 }
-
 func (c *Client) handleChatMessage(data []byte) {
 	text, color, err := DeserializeUserMsg(data)
 	if err != nil {
